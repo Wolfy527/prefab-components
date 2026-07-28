@@ -13,6 +13,12 @@ public static class PropToolsEditorTheme
     public static readonly Color AccentDark = new Color(0.58f, 0.24f, 0.06f, 1f);
     public static readonly Color AccentDim = new Color(1.00f, 0.42f, 0.10f, 0.24f);
     public static readonly Color AccentSoft = new Color(1.00f, 0.50f, 0.13f, 0.10f);
+    public static readonly Color HighlightFill =
+        new Color(1.00f, 0.48f, 0.12f, 0.18f);
+    public static readonly Color HighlightBorder =
+        new Color(1.00f, 0.70f, 0.30f, 0.94f);
+    public static readonly Color HighlightAccent =
+        new Color(1.00f, 0.76f, 0.38f, 1f);
 
     public static readonly Color Background = new Color(0.120f, 0.116f, 0.110f, 1f);
     public static readonly Color BackgroundDark = new Color(0.070f, 0.068f, 0.065f, 1f);

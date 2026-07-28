@@ -108,6 +108,7 @@ public static class PropToolsEditorTooltips
             { "Generated Targets", "Targets that will be created when the prefab setup is generated or updated." },
             { "Raycast", "Creates reusable avatar-relative locations and a constrained raycaster object." },
             { "World Drop", "Builds the selected World Drop prefab structure into the generated prop." },
+            { "Highlights", "Highlights the Builder settings controlled by the hierarchy entry under the mouse. Turn this off to keep only the hierarchy row hover." },
             { "Hierarchy Preview", "Preview of the hierarchy and components the current settings will generate." },
             { "Target Defaults & Preview Helpers", "Default target transforms and editor-only preview helper settings." },
             { "Live Mirroring", "Settings for generating and previewing opposite-side target pairs." },

@@ -36,8 +36,29 @@ public static class PropToolsEditor
     public static void Card(Action content) =>
         PropToolsEditorLayout.Card(content);
 
-    public static bool ItemCard(string stateKey, string badge, string title, string summary, bool defaultExpanded, Action content, string titleTooltip = null, string badgeTooltip = null) =>
-        PropToolsEditorLayout.ItemCard(stateKey, badge, title, summary, defaultExpanded, content, titleTooltip, badgeTooltip);
+    public static bool ItemCard(
+        string stateKey,
+        string badge,
+        string title,
+        string summary,
+        bool defaultExpanded,
+        Action content,
+        string titleTooltip = null,
+        string badgeTooltip = null,
+        UnityEngine.Object highlightTarget = null,
+        string highlightItemId = null) =>
+        PropToolsEditorLayout.ItemCard(
+            stateKey,
+            badge,
+            title,
+            summary,
+            defaultExpanded,
+            content,
+            titleTooltip,
+            badgeTooltip,
+            highlightTarget,
+            highlightItemId
+        );
 
     public static bool FeatureCard(string title, string tooltip, bool added, bool highlighted = false) =>
         PropToolsEditorLayout.FeatureCard(title, tooltip, added, highlighted);
@@ -129,6 +150,11 @@ public static class PropToolsEditor
 
     public static void Stats(string text) =>
         PropToolsEditorMessages.Stats(text);
+
+    public static void Hint(
+        string message,
+        float minimumHeight = 34f) =>
+        PropToolsEditorMessages.Hint(message, minimumHeight);
 
     public static bool Button(string text, float height = 28f) =>
         PropToolsEditorControls.PrimaryButton(text, height);

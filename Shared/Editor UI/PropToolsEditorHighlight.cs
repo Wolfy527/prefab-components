@@ -31,6 +31,7 @@ public static class PropToolsEditorHighlight
 
     private const string ModulePrefix = "@module:";
     private const string FeaturePrefix = "@feature:";
+    private const string ItemPrefix = "@item:";
     private static int currentScopeId;
     private static readonly HashSet<string> comparisonProperties = new HashSet<string>();
     private static readonly Dictionary<int, HoverState> hoverByScope =
@@ -67,32 +68,27 @@ public static class PropToolsEditorHighlight
         int targetId = property.serializedObject.targetObject.GetInstanceID();
         string path = property.propertyPath;
         HoverState state = GetHoverState();
-        float intensity = 0f;
+        bool highlighted =
+            targetId == state.targetId &&
+            state.properties.Contains(path);
 
-        if (targetId == state.targetId &&
-            state.properties.Contains(path))
-        {
-            intensity = 0.65f;
-        }
-
-        if (intensity <= 0f || Event.current.type != EventType.Repaint)
+        if (!highlighted || Event.current.type != EventType.Repaint)
             return;
 
-        Color fill = new Color(
-            PropToolsEditorTheme.Accent.r,
-            PropToolsEditorTheme.Accent.g,
-            PropToolsEditorTheme.Accent.b,
-            0.10f * intensity
+        EditorGUI.DrawRect(rect, PropToolsEditorTheme.HighlightFill);
+        PropToolsEditorDrawing.Border(
+            rect,
+            PropToolsEditorTheme.HighlightBorder
         );
-        Color border = new Color(
-            PropToolsEditorTheme.AccentBright.r,
-            PropToolsEditorTheme.AccentBright.g,
-            PropToolsEditorTheme.AccentBright.b,
-            0.35f + (0.45f * intensity)
+        EditorGUI.DrawRect(
+            new Rect(
+                rect.x,
+                rect.y + 2f,
+                4f,
+                Mathf.Max(0f, rect.height - 4f)
+            ),
+            PropToolsEditorTheme.HighlightAccent
         );
-
-        EditorGUI.DrawRect(rect, fill);
-        PropToolsEditorDrawing.Border(rect, border);
     }
 
     public static string Module(string moduleId) =>
@@ -117,6 +113,21 @@ public static class PropToolsEditorHighlight
         return target != null &&
                target.GetInstanceID() == state.targetId &&
                state.properties.Contains(Feature(generationModuleId));
+    }
+
+    public static string Item(string itemId) =>
+        string.IsNullOrWhiteSpace(itemId)
+            ? null
+            : ItemPrefix + itemId;
+
+    public static bool IsItemHovered(
+        UnityEngine.Object target,
+        string itemId)
+    {
+        HoverState state = GetHoverState();
+        return target != null &&
+               target.GetInstanceID() == state.targetId &&
+               state.properties.Contains(Item(itemId));
     }
 
     private static HoverState GetHoverState()

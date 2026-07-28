@@ -67,11 +67,21 @@ public static class PropToolsEditorFoldouts
             right,
             0.34f
         );
+
+        if (selected)
+        {
+            fill = Color.Lerp(
+                fill,
+                PropToolsEditorTheme.AccentDark,
+                0.32f
+            );
+        }
+
         PropToolsEditorDrawing.RoundedRect(
             rect,
             fill,
             selected
-                ? PropToolsEditorTheme.BorderStrong
+                ? PropToolsEditorTheme.HighlightBorder
                 : hover
                     ? PropToolsEditorTheme.Border
                     : PropToolsEditorTheme.BorderSoft,
@@ -80,8 +90,12 @@ public static class PropToolsEditorFoldouts
         );
         PropToolsEditorDrawing.RoundedAccentBar(
             rect,
-            enabled ? PropToolsEditorTheme.Accent : PropToolsEditorTheme.TextDim,
-            selected ? 5f : 4f,
+            selected
+                ? PropToolsEditorTheme.HighlightAccent
+                : enabled
+                    ? PropToolsEditorTheme.Accent
+                    : PropToolsEditorTheme.TextDim,
+            selected ? 6f : 4f,
             PropToolsEditorSpacing.AccentVerticalInset
         );
 

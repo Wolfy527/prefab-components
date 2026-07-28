@@ -294,7 +294,9 @@ public static class PropToolsEditorLayout
         bool defaultExpanded,
         Action content,
         string titleTooltip = null,
-        string badgeTooltip = null)
+        string badgeTooltip = null,
+        UnityEngine.Object highlightTarget = null,
+        string highlightItemId = null)
     {
         string key = BuildGroupStateKey("ItemCard." + stateKey);
         bool expanded = LoadGroupState(key, defaultExpanded);
@@ -304,20 +306,50 @@ public static class PropToolsEditorLayout
 
         Rect header = GUILayoutUtility.GetRect(0, 34f, GUILayout.ExpandWidth(true));
         bool hover = header.Contains(Event.current.mousePosition);
+        bool highlighted =
+            !expanded &&
+            PropToolsEditorHighlight.IsItemHovered(
+                highlightTarget,
+                highlightItemId
+            );
 
         if (Event.current.type == EventType.Repaint)
         {
+            Color collapsedHighlightFill = Color.Lerp(
+                PropToolsEditorTheme.ItemHeader,
+                PropToolsEditorTheme.AccentDark,
+                0.24f
+            );
+            Color collapsedHighlightBorder = new Color(
+                PropToolsEditorTheme.AccentBright.r,
+                PropToolsEditorTheme.AccentBright.g,
+                PropToolsEditorTheme.AccentBright.b,
+                0.68f
+            );
+
             PropToolsEditorDrawing.RoundedRect(
                 header,
-                hover ? PropToolsEditorTheme.ItemHeaderHover : PropToolsEditorTheme.ItemHeader,
-                expanded || hover ? PropToolsEditorTheme.Border : PropToolsEditorTheme.BorderSoft,
+                highlighted
+                    ? collapsedHighlightFill
+                    : hover
+                        ? PropToolsEditorTheme.ItemHeaderHover
+                        : PropToolsEditorTheme.ItemHeader,
+                highlighted
+                    ? collapsedHighlightBorder
+                    : expanded || hover
+                        ? PropToolsEditorTheme.Border
+                        : PropToolsEditorTheme.BorderSoft,
                 4f,
                 true
             );
             PropToolsEditorDrawing.RoundedAccentBar(
                 header,
-                expanded ? PropToolsEditorTheme.Accent : PropToolsEditorTheme.TextDim,
-                3f,
+                highlighted
+                    ? PropToolsEditorTheme.AccentBright
+                    : expanded
+                        ? PropToolsEditorTheme.Accent
+                        : PropToolsEditorTheme.TextDim,
+                highlighted ? 4f : 3f,
                 PropToolsEditorSpacing.AccentVerticalInset
             );
         }
@@ -443,12 +475,7 @@ public static class PropToolsEditorLayout
         if (Event.current.type == EventType.Repaint)
         {
             Color fill = highlighted
-                ? new Color(
-                    PropToolsEditorTheme.Accent.r,
-                    PropToolsEditorTheme.Accent.g,
-                    PropToolsEditorTheme.Accent.b,
-                    0.12f
-                )
+                ? PropToolsEditorTheme.HighlightFill
                 : hover
                     ? PropToolsEditorTheme.ItemHeaderHover
                     : PropToolsEditorTheme.ItemHeader;
@@ -456,13 +483,19 @@ public static class PropToolsEditorLayout
             PropToolsEditorDrawing.RoundedRect(
                 row,
                 fill,
-                highlighted ? PropToolsEditorTheme.BorderStrong : PropToolsEditorTheme.BorderSoft,
+                highlighted
+                    ? PropToolsEditorTheme.HighlightBorder
+                    : PropToolsEditorTheme.BorderSoft,
                 4f
             );
             PropToolsEditorDrawing.RoundedAccentBar(
                 row,
-                added ? PropToolsEditorTheme.Accent : PropToolsEditorTheme.TextDim,
-                3f,
+                highlighted
+                    ? PropToolsEditorTheme.HighlightAccent
+                    : added
+                        ? PropToolsEditorTheme.Accent
+                        : PropToolsEditorTheme.TextDim,
+                highlighted ? 5f : 3f,
                 PropToolsEditorSpacing.AccentVerticalInset
             );
         }
@@ -548,23 +581,6 @@ public static class PropToolsEditorLayout
                 8f,
                 PropToolsEditorSpacing.AccentVerticalInset
             );
-
-            if (statusType != MessageType.None)
-            {
-                Color statusColor = StatusColor(statusType);
-                Rect statusMarker = new Rect(
-                    panel.x + 12f,
-                    panel.yMax - 4f,
-                    28f,
-                    2f
-                );
-                PropToolsEditorDrawing.RoundedRect(
-                    statusMarker,
-                    statusColor,
-                    statusColor,
-                    1f
-                );
-            }
         }
 
         EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
@@ -609,21 +625,6 @@ public static class PropToolsEditorLayout
     private static void BeginModuleShell()
     {
         EditorGUILayout.BeginVertical(ModuleShellStyle);
-    }
-
-    private static Color StatusColor(MessageType statusType)
-    {
-        switch (statusType)
-        {
-            case MessageType.Error:
-                return PropToolsEditorTheme.Error;
-            case MessageType.Warning:
-                return PropToolsEditorTheme.Warning;
-            case MessageType.Info:
-                return PropToolsEditorTheme.InfoAccent;
-            default:
-                return PropToolsEditorTheme.Accent;
-        }
     }
 
     private static void EndModuleShell()
