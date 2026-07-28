@@ -3,7 +3,7 @@
 Unity authoring components for VRChat prefabs.
 
 <a href="https://wolfy527.github.io/prefab-components/?install=1">
-  <img src=".github/assets/add-to-vcc.svg" alt="Add Prefab Components to VCC" width="172">
+  <img src=".github/assets/add-to-vcc-button.svg" alt="Add Prefab Components to VCC" width="132">
 </a>
 
 VCC repository: `https://wolfy527.github.io/prefab-components/index.json`
