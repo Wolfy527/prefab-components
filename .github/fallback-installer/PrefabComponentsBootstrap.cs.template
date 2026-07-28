@@ -18,6 +18,8 @@ internal static class PrefabComponentsBootstrap
     private const string BuilderPackageName =
         "com.wolfy527.prefab-builder";
     private const string BundledVersion = "@@BUNDLED_VERSION@@";
+    private const string UpdateWarningSessionKeyPrefix =
+        "Wolfy527.PrefabComponents.UpdateWarning.";
     private const string InstallerRoot =
         "Assets/Wolfy_527/~ Supporting Files/Prefab Components Installer";
     private const string PayloadPath =
@@ -83,15 +85,25 @@ internal static class PrefabComponentsBootstrap
         running = true;
         try
         {
-            if (IsPackageRegistered(ManagedPackageName) ||
-                HasPackageManifest(
+            bool hasManagedPackage = TryGetRegisteredPackageVersion(
+                ManagedPackageName,
+                out string managedVersion);
+            if (!hasManagedPackage)
+            {
+                hasManagedPackage = HasPackageManifest(
                     "Packages/com.wolfy527.prefab-components",
                     ManagedPackageName,
-                    out _))
+                    out managedVersion);
+            }
+
+            if (hasManagedPackage)
             {
+                if (CompareVersions(managedVersion, BundledVersion) < 0)
+                    ScheduleManagedPackageUpdateWarning(managedVersion);
+
                 Debug.Log(
-                    "[Prefab Components] The VCC package is already installed. " +
-                    "The bundled fallback was not imported.");
+                    $"[Prefab Components] VCC package {managedVersion} is already " +
+                    $"installed. Bundled fallback {BundledVersion} was not imported.");
                 ScheduleInstallerCleanup();
                 return;
             }
@@ -574,6 +586,57 @@ internal static class PrefabComponentsBootstrap
         }
 
         return false;
+    }
+
+    private static bool TryGetRegisteredPackageVersion(
+        string packageName,
+        out string version)
+    {
+        version = null;
+        PackageInfo[] packages = PackageInfo.GetAllRegisteredPackages();
+        if (packages == null)
+            return false;
+
+        foreach (PackageInfo package in packages)
+        {
+            if (package == null ||
+                !string.Equals(
+                    package.name,
+                    packageName,
+                    StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            version = package.version;
+            return !string.IsNullOrWhiteSpace(version);
+        }
+
+        return false;
+    }
+
+    private static void ScheduleManagedPackageUpdateWarning(
+        string installedVersion)
+    {
+        string sessionKey = UpdateWarningSessionKeyPrefix + BundledVersion;
+        if (SessionState.GetBool(sessionKey, false))
+            return;
+
+        SessionState.SetBool(sessionKey, true);
+        Debug.LogWarning(
+            $"[Prefab Components] An imported asset requires Prefab Components " +
+            $"{BundledVersion} or newer, but VCC package {installedVersion} is " +
+            "installed. Update Prefab Components through VCC.");
+
+        EditorApplication.delayCall += () =>
+            EditorUtility.DisplayDialog(
+                "Prefab Components Update Required",
+                "An imported asset requires a newer Prefab Components package." +
+                $"\n\nInstalled VCC version: {installedVersion}" +
+                $"\nRequired version: {BundledVersion} or newer" +
+                "\n\nUpdate " +
+                "Wolfy_527 - Prefab Components through VCC before using this asset.",
+                "OK");
     }
 
     private static bool HasPackageManifest(

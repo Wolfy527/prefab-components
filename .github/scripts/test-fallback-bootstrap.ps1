@@ -103,6 +103,20 @@ namespace UnityEditor
         public static bool DeleteAsset(string path) => true;
         public static void Refresh(ImportAssetOptions options) {}
     }
+
+    public static class EditorUtility
+    {
+        public static bool DisplayDialog(
+            string title,
+            string message,
+            string ok) => true;
+    }
+
+    public static class SessionState
+    {
+        public static bool GetBool(string key, bool defaultValue) => defaultValue;
+        public static void SetBool(string key, bool value) {}
+    }
 }
 
 namespace UnityEditor.PackageManager
@@ -110,6 +124,7 @@ namespace UnityEditor.PackageManager
     public sealed class PackageInfo
     {
         public string name;
+        public string version;
         public static PackageInfo[] GetAllRegisteredPackages() =>
             new PackageInfo[0];
     }

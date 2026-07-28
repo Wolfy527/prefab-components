@@ -1,5 +1,5 @@
 # Changelog
 
-## 1.0.15
+## 1.0.16
 
-- Fixed VCC takeover of bundled Unity-package installations.
+- Warns when an imported asset requires a newer VCC package.

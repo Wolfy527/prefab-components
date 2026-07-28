@@ -1,7 +1,7 @@
 {
   "name": "com.wolfy527.prefab-components",
   "displayName": "Wolfy_527 - Prefab Components",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "unity": "2022.3",
   "description": "Unity authoring components for VRChat prefabs.",
   "documentationUrl": "https://github.com/Wolfy527/prefab-components#readme",
