@@ -1,7 +1,7 @@
 {
   "name": "com.wolfy527.prefab-components",
   "displayName": "Wolfy_527 - Prefab Components",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "unity": "2022.3",
   "description": "Unity authoring components for VRChat prefabs.",
   "documentationUrl": "https://github.com/Wolfy527/prefab-components#readme",
@@ -12,7 +12,8 @@
     "com.vrchat.avatars": ">=3.7.0 <4.0.0"
   },
   "legacyFolders": {
-    "Assets\\Wolfy_527\\~ Supporting Files\\Scripts": "1a754f8d169daa9408e3740cfeeab3aa"
+    "Assets\\Wolfy_527\\~ Supporting Files\\Scripts": "1a754f8d169daa9408e3740cfeeab3aa",
+    "Packages\\com.wolfy527.prefab-components.fallback": ""
   },
   "legacyFiles": {
     "Assets\\Wolfy_527\\~ Supporting Files\\Ghost Material.mat": "4342400023fc9204e9fab7239dec44ef"

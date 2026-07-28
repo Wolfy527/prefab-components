@@ -1,6 +1,5 @@
 # Changelog
 
-## 1.0.13
+## 1.0.14
 
-- Added guarded fallback installation for Unity packages and product imports.
-- Improved legacy migration, cleanup, and compatibility checks.
+- Fixed VCC takeover of bundled fallback installations.

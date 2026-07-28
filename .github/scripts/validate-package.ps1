@@ -110,6 +110,19 @@ if ($ExpectedName -eq "com.wolfy527.prefab-components") {
         )
     }
 
+    $fallbackPackagePath = "Packages\com.wolfy527.prefab-components.fallback"
+    $fallbackPackageProperty = if ($null -ne $manifest.legacyFolders) {
+        $manifest.legacyFolders.PSObject.Properties[$fallbackPackagePath]
+    }
+    else {
+        $null
+    }
+    if ($null -eq $fallbackPackageProperty -or $fallbackPackageProperty.Value -ne "") {
+        $errors.Add(
+            "package.json must remove embedded fallback folder '$fallbackPackagePath'."
+        )
+    }
+
     $legacyFilePath = "Assets\Wolfy_527\~ Supporting Files\Ghost Material.mat"
     $legacyFileGuid = "4342400023fc9204e9fab7239dec44ef"
     $legacyFileProperty = if ($null -ne $manifest.legacyFiles) {
