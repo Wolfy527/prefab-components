@@ -35,10 +35,10 @@ jobs:
             .packages["com.wolfy527.prop-components"] == null and
             (.packages | length) == 1 and
             (.packages["com.wolfy527.prefab-components"].versions | length) == 1 and
-            .packages["com.wolfy527.prefab-components"].versions["1.0.13"] as $package |
+            .packages["com.wolfy527.prefab-components"].versions["1.0.14"] as $package |
             $package.name == "com.wolfy527.prefab-components" and
             $package.displayName == "Wolfy_527 - Prefab Components" and
-            $package.version == "1.0.13" and
+            $package.version == "1.0.14" and
             ($package.author | type) == "object" and
             ($package.author.name | type) == "string" and
             ($package.author.email | type) == "string" and
@@ -47,6 +47,7 @@ jobs:
             $package.license == "LicenseRef-Wolfy527-Proprietary" and
             ($package.licensesUrl | endswith("/LICENSE.md")) and
             $package.legacyFolders["Assets\\Wolfy_527\\~ Supporting Files\\Scripts"] == "1a754f8d169daa9408e3740cfeeab3aa" and
+            $package.legacyFolders["Packages\\com.wolfy527.prefab-components.fallback"] == "" and
             $package.legacyFiles["Assets\\Wolfy_527\\~ Supporting Files\\Ghost Material.mat"] == "4342400023fc9204e9fab7239dec44ef" and
             ($package.legacyPackages | index("dev.avatar-tools.prop-components")) != null and
             ($package.legacyPackages | index("com.wolfy527.prop-components")) != null and
@@ -58,12 +59,12 @@ jobs:
       - name: Verify published package artifact
         shell: bash
         run: |
-          package_url="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.13"].url' .vpm-listing/index.json)"
-          expected_sha="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.13"].zipSHA256' .vpm-listing/index.json)"
+          package_url="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.14"].url' .vpm-listing/index.json)"
+          expected_sha="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.14"].zipSHA256' .vpm-listing/index.json)"
           curl --fail --location --silent --show-error "$package_url" --output package.zip
           echo "$expected_sha  package.zip" | sha256sum --check -
           unzip -p package.zip package.json | jq -e '
             .name == "com.wolfy527.prefab-components" and
             .displayName == "Wolfy_527 - Prefab Components" and
-            .version == "1.0.13"
+            .version == "1.0.14"
           ' > /dev/null
