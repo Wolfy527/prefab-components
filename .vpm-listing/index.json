@@ -7,18 +7,18 @@
   "packages": {
     "com.wolfy527.prefab-components": {
       "versions": {
-        "1.0.15": {
+        "1.0.16": {
           "name": "com.wolfy527.prefab-components",
           "displayName": "Wolfy_527 - Prefab Components",
-          "version": "1.0.15",
+          "version": "1.0.16",
           "unity": "2022.3",
           "description": "Unity authoring components for VRChat prefabs.",
           "documentationUrl": "https://github.com/Wolfy527/prefab-components#readme",
           "changelogUrl": "https://github.com/Wolfy527/prefab-components/blob/main/CHANGELOG.md",
           "licensesUrl": "https://github.com/Wolfy527/prefab-components/blob/main/LICENSE.md",
           "license": "LicenseRef-Wolfy527-Proprietary",
-          "url": "https://github.com/Wolfy527/prefab-components/releases/download/v1.0.15/com.wolfy527.prefab-components-1.0.15.zip",
-          "zipSHA256": "a37e61b7d49f94e196d8ff19be365b36b801840e51b226456a87e1be63414f64",
+          "url": "https://github.com/Wolfy527/prefab-components/releases/download/v1.0.16/com.wolfy527.prefab-components-1.0.16.zip",
+          "zipSHA256": "0bb10de740589f42e58e6271f92714e6543293df93f6f57f87c8855e38598de2",
           "vpmDependencies": {
             "com.vrchat.avatars": ">=3.7.0 <4.0.0"
           },
