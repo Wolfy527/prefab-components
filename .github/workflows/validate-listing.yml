@@ -35,10 +35,10 @@ jobs:
             .packages["com.wolfy527.prop-components"] == null and
             (.packages | length) == 1 and
             (.packages["com.wolfy527.prefab-components"].versions | length) == 1 and
-            .packages["com.wolfy527.prefab-components"].versions["1.0.8"] as $package |
+            .packages["com.wolfy527.prefab-components"].versions["1.0.9"] as $package |
             $package.name == "com.wolfy527.prefab-components" and
             $package.displayName == "Wolfy_527 - Prefab Components" and
-            $package.version == "1.0.8" and
+            $package.version == "1.0.9" and
             ($package.author | type) == "object" and
             ($package.author.name | type) == "string" and
             ($package.author.email | type) == "string" and
@@ -57,12 +57,12 @@ jobs:
       - name: Verify published package artifact
         shell: bash
         run: |
-          package_url="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.8"].url' .vpm-listing/index.json)"
-          expected_sha="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.8"].zipSHA256' .vpm-listing/index.json)"
+          package_url="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.9"].url' .vpm-listing/index.json)"
+          expected_sha="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.9"].zipSHA256' .vpm-listing/index.json)"
           curl --fail --location --silent --show-error "$package_url" --output package.zip
           echo "$expected_sha  package.zip" | sha256sum --check -
           unzip -p package.zip package.json | jq -e '
             .name == "com.wolfy527.prefab-components" and
             .displayName == "Wolfy_527 - Prefab Components" and
-            .version == "1.0.8"
+            .version == "1.0.9"
           ' > /dev/null
