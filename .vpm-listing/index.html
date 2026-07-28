@@ -9,8 +9,8 @@
     :root {
       color-scheme: dark;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #17151c;
-      color: #f6f1f8;
+      background: #121110;
+      color: #fbf2e3;
     }
     * { box-sizing: border-box; }
     body {
@@ -20,20 +20,29 @@
       place-items: center;
       padding: 24px;
       background:
-        radial-gradient(circle at 15% 15%, rgba(239, 141, 69, .16), transparent 34rem),
-        radial-gradient(circle at 85% 85%, rgba(178, 91, 214, .14), transparent 34rem),
-        #17151c;
+        radial-gradient(circle at 15% 15%, rgba(255, 128, 33, .14), transparent 34rem),
+        radial-gradient(circle at 85% 85%, rgba(255, 168, 61, .07), transparent 32rem),
+        #121110;
     }
     main {
+      position: relative;
+      overflow: hidden;
       width: min(680px, 100%);
       padding: clamp(28px, 6vw, 52px);
-      border: 1px solid rgba(255, 255, 255, .1);
-      border-radius: 22px;
-      background: rgba(35, 31, 42, .92);
+      border: 1px solid rgba(255, 148, 46, .22);
+      border-radius: 14px;
+      background: linear-gradient(145deg, rgba(46, 42, 38, .97), rgba(24, 23, 21, .98));
       box-shadow: 0 24px 70px rgba(0, 0, 0, .35);
     }
+    main::before {
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 5px;
+      background: #ff8021;
+      content: "";
+    }
     .eyebrow {
-      color: #f3a66e;
+      color: #ffa83d;
       font-weight: 750;
       letter-spacing: .12em;
       text-transform: uppercase;
@@ -47,7 +56,7 @@
     }
     p {
       margin: 0 0 28px;
-      color: #ccc3d2;
+      color: #d5c7b5;
       font-size: 1.05rem;
       line-height: 1.65;
     }
@@ -57,16 +66,35 @@
       justify-content: center;
       min-height: 48px;
       padding: 0 22px;
-      border-radius: 12px;
-      background: linear-gradient(135deg, #ef8d45, #d76b4b);
-      color: #201820;
+      border: 1px solid rgba(255, 148, 46, .68);
+      border-radius: 8px;
+      background: linear-gradient(90deg, #9e400f, #2e170d);
+      color: #fbf2e3;
       font-weight: 800;
       text-decoration: none;
-      box-shadow: 0 10px 28px rgba(239, 141, 69, .22);
+      box-shadow:
+        inset 0 1px rgba(255, 255, 255, .06),
+        0 8px 22px rgba(0, 0, 0, .28);
+      transition: border-color .16s ease, box-shadow .16s ease, filter .16s ease, transform .16s ease;
+    }
+    a.button:hover,
+    a.button:focus-visible {
+      border-color: #ffa83d;
+      filter: brightness(1.14);
+      box-shadow:
+        inset 0 1px rgba(255, 255, 255, .08),
+        0 0 0 2px rgba(255, 128, 33, .15),
+        0 10px 26px rgba(0, 0, 0, .32);
+      outline: none;
+      transform: translateY(-1px);
+    }
+    a.button:active {
+      filter: brightness(.98);
+      transform: translateY(0);
     }
     .note {
       margin-top: 18px;
-      color: #93899b;
+      color: #9e9385;
       font-size: .86rem;
     }
   </style>
@@ -76,7 +104,7 @@
     <div class="eyebrow">Wolfy_527</div>
     <h1>Prefab Components</h1>
     <p>Reusable Unity authoring components for VRChat prefabs, including Live Mirroring and upload-safe authoring helpers.</p>
-    <a class="button" id="add-to-vcc" href="vcc://vpm/addRepo?url=https%3A%2F%2Fwolfy527.github.io%2Fprefab-components%2Findex.json">Add to VCC</a>
+    <a class="button" id="add-to-vcc" href="./?install=1" target="_blank" rel="noopener">Add to VCC</a>
     <div class="note">Requires VRChat Creator Companion on this computer.</div>
   </main>
   <script>
@@ -84,6 +112,11 @@
     const installRequested = new URLSearchParams(window.location.search).get("install") === "1";
 
     if (installRequested) {
+      const button = document.getElementById("add-to-vcc");
+      button.href = vccUrl;
+      button.removeAttribute("target");
+      button.removeAttribute("rel");
+      button.textContent = "Open VCC";
       window.location.assign(vccUrl);
     }
   </script>
