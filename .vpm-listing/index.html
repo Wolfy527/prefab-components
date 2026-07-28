@@ -76,8 +76,16 @@
     <div class="eyebrow">Wolfy_527</div>
     <h1>Prefab Components</h1>
     <p>Reusable Unity authoring components for VRChat prefabs, including Live Mirroring and upload-safe authoring helpers.</p>
-    <a class="button" href="vcc://vpm/addRepo?url=https%3A%2F%2Fwolfy527.github.io%2Fprefab-components%2Findex.json">Add to VCC</a>
+    <a class="button" id="add-to-vcc" href="vcc://vpm/addRepo?url=https%3A%2F%2Fwolfy527.github.io%2Fprefab-components%2Findex.json">Add to VCC</a>
     <div class="note">Requires VRChat Creator Companion on this computer.</div>
   </main>
+  <script>
+    const vccUrl = "vcc://vpm/addRepo?url=https%3A%2F%2Fwolfy527.github.io%2Fprefab-components%2Findex.json";
+    const installRequested = new URLSearchParams(window.location.search).get("install") === "1";
+
+    if (installRequested) {
+      window.location.assign(vccUrl);
+    }
+  </script>
 </body>
 </html>

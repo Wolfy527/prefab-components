@@ -2,7 +2,7 @@
 
 Unity authoring components for VRChat prefabs.
 
-[Add Prefab Components to VCC](vcc://vpm/addRepo?url=https%3A%2F%2Fwolfy527.github.io%2Fprefab-components%2Findex.json)
+[![Add Prefab Components to VCC](https://img.shields.io/badge/Add_to_VCC-Prefab_Components-ef8d45?style=for-the-badge)](https://wolfy527.github.io/prefab-components/?install=1)
 
 VCC repository: `https://wolfy527.github.io/prefab-components/index.json`
 
