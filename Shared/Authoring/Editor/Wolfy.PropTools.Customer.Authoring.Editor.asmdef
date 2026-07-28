@@ -1,0 +1,18 @@
+{
+  "name": "Wolfy.PropTools.Customer.Authoring.Editor",
+  "rootNamespace": "Wolfy.PropTools.Customer.Authoring.Editor",
+  "references": [
+    "Wolfy.PropTools.Customer.Authoring",
+    "VRC.SDKBase",
+    "VRC.SDKBase.Editor.BuildPipeline"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

@@ -1,0 +1,16 @@
+{
+  "name": "Wolfy.PropTools.Customer.LiveMirroring",
+  "rootNamespace": "Wolfy.PropTools.Customer.LiveMirroring",
+  "references": [
+    "Wolfy.PropTools.Customer.Authoring"
+  ],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

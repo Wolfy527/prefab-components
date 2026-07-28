@@ -1,0 +1,68 @@
+name: Validate VPM Listing
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate listing JSON
+        shell: bash
+        run: |
+          jq -e . .vpm-listing/source.json > /dev/null
+          jq -e . .vpm-listing/index.json > /dev/null
+
+      - name: Validate customer-only package entry
+        shell: bash
+        run: |
+          jq -e '
+            .name == "Wolfy_527 - Prefab Components" and
+            .id == "com.wolfy527.prefab-components.listing" and
+            .author == "Wolfy527" and
+            (.author | type) == "string" and
+            .url == "https://wolfy527.github.io/prefab-components/index.json" and
+            .packages["dev.avatar-tools.prop-builder"] == null and
+            .packages["com.wolfy527.prefab-builder"] == null and
+            .packages["com.wolfy527.prop-components"] == null and
+            (.packages | length) == 1 and
+            (.packages["com.wolfy527.prefab-components"].versions | length) == 1 and
+            .packages["com.wolfy527.prefab-components"].versions["1.0.8"] as $package |
+            $package.name == "com.wolfy527.prefab-components" and
+            $package.displayName == "Wolfy_527 - Prefab Components" and
+            $package.version == "1.0.8" and
+            ($package.author | type) == "object" and
+            ($package.author.name | type) == "string" and
+            ($package.author.email | type) == "string" and
+            ($package.vpmDependencies | type) == "object" and
+            ($package.vpmDependencies["com.vrchat.avatars"] | type) == "string" and
+            $package.license == "LicenseRef-Wolfy527-Proprietary" and
+            ($package.licensesUrl | endswith("/LICENSE.md")) and
+            $package.legacyFolders["Assets\\Wolfy_527\\~ Supporting Files\\Scripts"] == "1a754f8d169daa9408e3740cfeeab3aa" and
+            $package.legacyFiles["Assets\\Wolfy_527\\~ Supporting Files\\Ghost Material.mat"] == "4342400023fc9204e9fab7239dec44ef" and
+            ($package.legacyPackages | index("dev.avatar-tools.prop-components")) != null and
+            ($package.legacyPackages | index("com.wolfy527.prop-components")) != null and
+            ($package.url | endswith(".zip")) and
+            ($package.zipSHA256 | test("^[0-9a-f]{64}$"))
+          ' .vpm-listing/index.json > /dev/null
+
+      - name: Verify published package artifact
+        shell: bash
+        run: |
+          package_url="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.8"].url' .vpm-listing/index.json)"
+          expected_sha="$(jq -r '.packages["com.wolfy527.prefab-components"].versions["1.0.8"].zipSHA256' .vpm-listing/index.json)"
+          curl --fail --location --silent --show-error "$package_url" --output package.zip
+          echo "$expected_sha  package.zip" | sha256sum --check -
+          unzip -p package.zip package.json | jq -e '
+            .name == "com.wolfy527.prefab-components" and
+            .displayName == "Wolfy_527 - Prefab Components" and
+            .version == "1.0.8"
+          ' > /dev/null

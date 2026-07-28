@@ -1,0 +1,15 @@
+{
+  "name": "Wolfy_527 - Prefab Components",
+  "id": "com.wolfy527.prefab-components.listing",
+  "url": "https://wolfy527.github.io/prefab-components/index.json",
+  "author": "Wolfy527",
+  "description": "Unity authoring components for VRChat prefabs.",
+  "infoLink": {
+    "url": "https://github.com/Wolfy527/prefab-components",
+    "text": "View package information"
+  },
+  "githubRepos": [
+    "Wolfy527/prefab-components"
+  ],
+  "packages": []
+}

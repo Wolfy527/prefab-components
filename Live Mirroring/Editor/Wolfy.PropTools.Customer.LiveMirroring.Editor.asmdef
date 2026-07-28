@@ -1,0 +1,18 @@
+{
+  "name": "Wolfy.PropTools.Customer.LiveMirroring.Editor",
+  "rootNamespace": "Wolfy.PropTools.Customer.LiveMirroring.Editor",
+  "references": [
+    "Wolfy.PropTools.Customer.Authoring",
+    "Wolfy.PropTools.Customer.LiveMirroring",
+    "Wolfy.PropTools.EditorUI"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

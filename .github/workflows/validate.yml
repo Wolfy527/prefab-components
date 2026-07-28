@@ -1,0 +1,20 @@
+name: Validate Package
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out package
+        uses: actions/checkout@v6
+
+      - name: Validate manifest and Unity metadata
+        shell: pwsh
+        run: ./.github/scripts/validate-package.ps1 -PackageRoot . -ExpectedName "com.wolfy527.prefab-components"
