@@ -23,7 +23,7 @@ internal static class PrefabComponentsBootstrap
     private const string PayloadPath =
         InstallerRoot + "/PrefabComponentsFallback.bytes";
     private const string FallbackPackagePath =
-        "Packages/com.wolfy527.prefab-components.fallback";
+        "Assets/Wolfy_527/~ Supporting Files/Prefab Components Fallback";
     private const string LegacyScriptsPath =
         "Assets/Wolfy_527/~ Supporting Files/Scripts";
     private const string LegacyScriptsGuid =
@@ -213,12 +213,13 @@ internal static class PrefabComponentsBootstrap
             Directory.Move(stagedPackage, targetPackage);
             newPackageInstalled = true;
 
-            // Package resolution can reload Unity's scripting domain. Do not wait
-            // inside a synchronous AssetDatabase refresh here: the bootstrap's
-            // call stack would be abandoned mid-transaction and Unity could leave
-            // its import progress UI open. The embedded package is already fully
-            // validated and moved into place, so request resolution and return.
-            Client.Resolve();
+            // Importing the fallback can reload Unity's scripting domain. Do not
+            // wait inside a synchronous refresh here: the bootstrap's call stack
+            // would be abandoned mid-transaction and Unity could leave its import
+            // progress UI open. The fallback is fully validated and moved into
+            // place, so request an asynchronous refresh and return.
+            EditorApplication.delayCall += () =>
+                AssetDatabase.Refresh(ImportAssetOptions.Default);
 
             string action;
             if (string.IsNullOrWhiteSpace(installedVersion))

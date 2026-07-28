@@ -110,7 +110,7 @@ if ($ExpectedName -eq "com.wolfy527.prefab-components") {
         )
     }
 
-    $fallbackPackagePath = "Packages\com.wolfy527.prefab-components.fallback"
+    $fallbackPackagePath = "Assets\Wolfy_527\~ Supporting Files\Prefab Components Fallback"
     $fallbackPackageProperty = if ($null -ne $manifest.legacyFolders) {
         $manifest.legacyFolders.PSObject.Properties[$fallbackPackagePath]
     }

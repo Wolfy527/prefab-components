@@ -23,5 +23,6 @@ Packages/com.wolfy527.prefab-components.fallback
 
 Prefab Builder keeps the installer staged. In a customer project, the bootstrap
 keeps the VPM package when present. Otherwise, it safely moves recognized legacy
-scripts aside and installs or updates the fallback without downgrading a newer
-version. Temporary installer files are removed when Unity closes.
+scripts aside and installs or updates the fallback under Supporting Files without
+downgrading a newer version. VCC removes that fallback before installing the
+managed package. Temporary installer files are removed when Unity closes.
