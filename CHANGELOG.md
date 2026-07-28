@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.0.9
+## 1.0.13
 
-- Added Prefab ID support for Prefab Builder compatibility.
-- UI polishing and bug fixes.
+- Added guarded fallback installation for Unity packages and product imports.
+- Improved legacy migration, cleanup, and compatibility checks.

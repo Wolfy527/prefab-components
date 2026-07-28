@@ -126,7 +126,8 @@ if ($ExpectedName -eq "com.wolfy527.prefab-components") {
 
     foreach ($legacyPackage in @(
         "dev.avatar-tools.prop-components",
-        "com.wolfy527.prop-components"
+        "com.wolfy527.prop-components",
+        "com.wolfy527.prefab-components.fallback"
     )) {
         if ($manifest.legacyPackages -notcontains $legacyPackage) {
             $errors.Add(
@@ -150,7 +151,7 @@ if ($ExpectedName -eq "com.wolfy527.prefab-components") {
     }
 }
 
-$ignoredRoots = @(".git", ".github", ".vpm-listing")
+$ignoredRoots = @(".git", ".github", ".vpm-listing", ".artifacts")
 $contentFiles = Get-ChildItem -LiteralPath $root -Recurse -File -Force | Where-Object {
     $relative = (Get-PackageRelativePath -BasePath $root -FullPath $_.FullName).Replace('\', '/')
     $topLevel = $relative.Split('/')[0]

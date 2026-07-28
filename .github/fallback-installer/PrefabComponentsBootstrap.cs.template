@@ -1,0 +1,881 @@
+namespace Wolfy527.PrefabComponentsFallbackInstaller
+{
+using System;
+using System.IO;
+using System.IO.Compression;
+using UnityEditor;
+using UnityEditor.PackageManager;
+using UnityEngine;
+using PackageInfo = UnityEditor.PackageManager.PackageInfo;
+
+[InitializeOnLoad]
+internal static class PrefabComponentsBootstrap
+{
+    private const string ManagedPackageName =
+        "com.wolfy527.prefab-components";
+    private const string FallbackPackageName =
+        "com.wolfy527.prefab-components.fallback";
+    private const string BuilderPackageName =
+        "com.wolfy527.prefab-builder";
+    private const string BundledVersion = "@@BUNDLED_VERSION@@";
+    private const string InstallerRoot =
+        "Assets/Wolfy_527/~ Supporting Files/Prefab Components Installer";
+    private const string PayloadPath =
+        InstallerRoot + "/PrefabComponentsFallback.bytes";
+    private const string FallbackPackagePath =
+        "Packages/com.wolfy527.prefab-components.fallback";
+    private const string LegacyScriptsPath =
+        "Assets/Wolfy_527/~ Supporting Files/Scripts";
+    private const string LegacyScriptsGuid =
+        "1a754f8d169daa9408e3740cfeeab3aa";
+    private const string LegacyPlaceholderMarkerName =
+        "Prefab Components Migration Placeholder.txt";
+    private const string LegacyPlaceholderMarkerContents =
+        "Wolfy_527 Prefab Components migration placeholder";
+    private const string LegacyGhostMaterialPath =
+        "Assets/Wolfy_527/~ Supporting Files/Ghost Material.mat";
+    private const string LegacyGhostMaterialGuid =
+        "4342400023fc9204e9fab7239dec44ef";
+    private const string LiveMirroringScriptMetaPath =
+        "Live Mirroring/Runtime/LiveMirroringSystem.cs.meta";
+    private const string LiveMirroringScriptGuid =
+        "5c54d508ba4a3ee4baa5148633885b51";
+    private const string GeneratedTargetMetadataMetaPath =
+        "Shared/Authoring/Runtime/GeneratedTargetMetadata.cs.meta";
+    private const string GeneratedTargetMetadataGuid =
+        "48742d3549a555842844b99523feab8f";
+    private const string GeneratedEditorOnlyObjectMetaPath =
+        "Shared/Authoring/Runtime/GeneratedEditorOnlyObject.cs.meta";
+    private const string GeneratedEditorOnlyObjectGuid =
+        "6a339ada66db0524bb16d5ed1fbe64bc";
+    private const string AuthoringOnlyComponentMetaPath =
+        "Shared/Authoring/Runtime/AuthoringOnlyComponent.cs.meta";
+    private const string AuthoringOnlyComponentGuid =
+        "40218417691f9c041a2ac01d1b9d1a5c";
+    private const string GhostMaterialMetaPath =
+        "Ghost Material.mat.meta";
+    private const string PawLogoMetaPath =
+        "Paw Heart Logo.png.meta";
+    private const string PawLogoGuid =
+        "c6672c7f5b5d72b4c9ebf65ad64cfc37";
+
+    private static bool running;
+    private static bool cleanupScheduled;
+
+    static PrefabComponentsBootstrap()
+    {
+        EditorApplication.delayCall += Run;
+    }
+
+    private static void Run()
+    {
+        if (running || !File.Exists(ToAbsolutePath(PayloadPath)))
+            return;
+
+        // The in-house Builder keeps these files staged for product exports.
+        if (IsPackageRegistered(BuilderPackageName) ||
+            HasPackageManifest(
+                "Packages/com.wolfy527.prefab-builder",
+                BuilderPackageName,
+                out _))
+            return;
+
+        running = true;
+        try
+        {
+            if (IsPackageRegistered(ManagedPackageName) ||
+                HasPackageManifest(
+                    "Packages/com.wolfy527.prefab-components",
+                    ManagedPackageName,
+                    out _))
+            {
+                Debug.Log(
+                    "[Prefab Components] The VCC package is already installed. " +
+                    "The bundled fallback was not imported.");
+                ScheduleInstallerCleanup();
+                return;
+            }
+
+            bool fallbackPathExists = Directory.Exists(
+                ToAbsolutePath(FallbackPackagePath));
+            bool hasFallbackPackage = HasPackageManifest(
+                FallbackPackagePath,
+                FallbackPackageName,
+                out string installedVersion);
+
+            if (fallbackPathExists && !hasFallbackPackage)
+            {
+                throw new InvalidDataException(
+                    $"The reserved fallback path already exists but is not a " +
+                    $"recognized Prefab Components fallback:\n{FallbackPackagePath}");
+            }
+
+            int installedVersionComparison = hasFallbackPackage
+                ? CompareVersions(installedVersion, BundledVersion)
+                : -1;
+            bool fallbackGuidIsCompatible =
+                !hasFallbackPackage ||
+                HasCompatiblePackageGuids(FallbackPackagePath);
+
+            if (hasFallbackPackage &&
+                installedVersionComparison >= 0 &&
+                fallbackGuidIsCompatible)
+            {
+                Debug.Log(
+                    $"[Prefab Components] Fallback {installedVersion} is already " +
+                    $"installed. Bundled fallback {BundledVersion} was skipped.");
+                ScheduleInstallerCleanup();
+                return;
+            }
+
+            if (hasFallbackPackage &&
+                installedVersionComparison > 0 &&
+                !fallbackGuidIsCompatible)
+            {
+                throw new InvalidDataException(
+                    $"Fallback {installedVersion} has incompatible compatibility " +
+                    $"GUIDs. Bundled fallback {BundledVersion} is " +
+                    "older and will not overwrite it.");
+            }
+
+            InstallFallback(installedVersion);
+            ScheduleInstallerCleanup();
+        }
+        catch (Exception exception)
+        {
+            Debug.LogError(
+                "[Prefab Components] The bundled fallback could not be installed. " +
+                "The installer files were left in the project so the operation can " +
+                "be retried.\n" + exception);
+        }
+        finally
+        {
+            running = false;
+        }
+    }
+
+    private static void InstallFallback(string installedVersion)
+    {
+        string projectRoot = GetProjectRoot();
+        string workingRoot = Path.Combine(
+            projectRoot,
+            "Library",
+            "Wolfy_527",
+            "Prefab Components Fallback",
+            Guid.NewGuid().ToString("N"));
+        string stagedPackage = Path.Combine(workingRoot, "package");
+        string backupPackage = Path.Combine(workingRoot, "backup");
+        string targetPackage = ToAbsolutePath(FallbackPackagePath);
+        bool previousPackageMoved = false;
+        bool newPackageInstalled = false;
+        bool preserveWorkingRoot = false;
+        LegacyFolderMove legacyMove = null;
+        LegacyFileMove legacyGhostMaterialMove = null;
+
+        Directory.CreateDirectory(stagedPackage);
+        try
+        {
+            ExtractPayload(ToAbsolutePath(PayloadPath), stagedPackage);
+
+            if (!HasPackageManifestAtAbsolutePath(
+                    stagedPackage,
+                    FallbackPackageName,
+                    out string payloadVersion))
+            {
+                throw new InvalidDataException(
+                    "The fallback payload does not contain the expected package.");
+            }
+
+            if (!string.Equals(
+                    payloadVersion,
+                    BundledVersion,
+                    StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"Fallback payload version {payloadVersion} does not match " +
+                    $"installer version {BundledVersion}.");
+            }
+
+            // Remove the known legacy source tree before the fallback package
+            // becomes visible to Unity. Both carry the same script GUIDs, so
+            // exposing them together can make Unity regenerate the package GUIDs
+            // and break existing prefab references.
+            legacyMove = MoveLegacyScriptsOutOfAssets(projectRoot);
+            legacyGhostMaterialMove = MoveLegacyGhostMaterialOutOfAssets(
+                projectRoot);
+
+            if (Directory.Exists(targetPackage))
+            {
+                Directory.Move(targetPackage, backupPackage);
+                previousPackageMoved = true;
+            }
+
+            Directory.Move(stagedPackage, targetPackage);
+            newPackageInstalled = true;
+
+            // Package resolution can reload Unity's scripting domain. Do not wait
+            // inside a synchronous AssetDatabase refresh here: the bootstrap's
+            // call stack would be abandoned mid-transaction and Unity could leave
+            // its import progress UI open. The embedded package is already fully
+            // validated and moved into place, so request resolution and return.
+            Client.Resolve();
+
+            string action;
+            if (string.IsNullOrWhiteSpace(installedVersion))
+                action = "Installed";
+            else if (CompareVersions(installedVersion, BundledVersion) == 0)
+                action = "Repaired";
+            else
+                action = $"Updated from {installedVersion} to";
+            Debug.Log(
+                $"[Prefab Components] {action} fallback {BundledVersion}. " +
+                "Install the VCC package later for managed updates.");
+
+            if (legacyMove != null)
+            {
+                Debug.Log(
+                    "[Prefab Components] Moved obsolete legacy scripts to:\n" +
+                    legacyMove.BackupScriptsPath);
+            }
+
+            if (legacyGhostMaterialMove != null)
+            {
+                Debug.Log(
+                    "[Prefab Components] Moved the obsolete legacy Ghost Material " +
+                    "to:\n" + legacyGhostMaterialMove.BackupAssetPath);
+            }
+        }
+        catch (Exception installationException)
+        {
+            Exception rollbackException = TryRollbackInstall(
+                targetPackage,
+                backupPackage,
+                newPackageInstalled,
+                previousPackageMoved,
+                legacyMove,
+                legacyGhostMaterialMove);
+            preserveWorkingRoot = rollbackException != null;
+
+            if (rollbackException != null)
+            {
+                throw new AggregateException(
+                    "Fallback installation failed and could not be fully rolled back. " +
+                    $"Recovery files were kept at:\n{workingRoot}",
+                    installationException,
+                    rollbackException);
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (!preserveWorkingRoot && Directory.Exists(workingRoot))
+                Directory.Delete(workingRoot, true);
+        }
+    }
+
+    private static LegacyFolderMove MoveLegacyScriptsOutOfAssets(
+        string projectRoot)
+    {
+        string legacyAbsolutePath = ToAbsolutePath(LegacyScriptsPath);
+        if (!Directory.Exists(legacyAbsolutePath))
+            return null;
+
+        string assetsRoot = Path.GetFullPath(Application.dataPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        string normalizedLegacyPath = Path.GetFullPath(legacyAbsolutePath);
+        if (!normalizedLegacyPath.StartsWith(
+                assetsRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "The legacy Scripts path resolved outside this project's Assets " +
+                "folder and was not moved.");
+        }
+
+        string actualGuid = AssetDatabase.AssetPathToGUID(LegacyScriptsPath);
+        bool hasExpectedGuid = string.Equals(
+            actualGuid,
+            LegacyScriptsGuid,
+            StringComparison.OrdinalIgnoreCase);
+        bool hasLegacyCustomerFolder = Directory.Exists(
+            Path.Combine(normalizedLegacyPath, "Customer"));
+
+        if (!hasExpectedGuid && !hasLegacyCustomerFolder)
+        {
+            throw new InvalidDataException(
+                "A Scripts folder exists at the old Prefab Components location, " +
+                "but it does not match the known legacy package. It was left " +
+                "unchanged for safety.");
+        }
+
+        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        string backupParent = Path.Combine(
+            projectRoot,
+            "Legacy Package Backups",
+            "Wolfy_527 Prefab Components",
+            timestamp + "-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        string backupScriptsPath = Path.Combine(backupParent, "Scripts");
+        string legacyMetaPath = normalizedLegacyPath + ".meta";
+        string backupMetaPath = backupScriptsPath + ".meta";
+
+        Directory.CreateDirectory(backupParent);
+        bool folderMoved = false;
+        try
+        {
+            Directory.Move(normalizedLegacyPath, backupScriptsPath);
+            folderMoved = true;
+
+            if (File.Exists(legacyMetaPath))
+                File.Move(legacyMetaPath, backupMetaPath);
+
+            CreateLegacyCompilePlaceholders(
+                backupScriptsPath,
+                normalizedLegacyPath);
+
+            return new LegacyFolderMove(
+                normalizedLegacyPath,
+                legacyMetaPath,
+                backupScriptsPath,
+                backupMetaPath);
+        }
+        catch
+        {
+            if (folderMoved && Directory.Exists(backupScriptsPath))
+            {
+                if (Directory.Exists(normalizedLegacyPath))
+                    Directory.Delete(normalizedLegacyPath, true);
+
+                Directory.Move(backupScriptsPath, normalizedLegacyPath);
+            }
+
+            if (File.Exists(backupMetaPath) && !File.Exists(legacyMetaPath))
+                File.Move(backupMetaPath, legacyMetaPath);
+
+            throw;
+        }
+    }
+
+    private static void CreateLegacyCompilePlaceholders(
+        string backupScriptsPath,
+        string legacyScriptsPath)
+    {
+        string backupRoot = Path.GetFullPath(backupScriptsPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        Directory.CreateDirectory(legacyScriptsPath);
+
+        foreach (string sourcePath in Directory.GetFiles(
+                     backupScriptsPath,
+                     "*.cs",
+                     SearchOption.AllDirectories))
+        {
+            string normalizedSourcePath = Path.GetFullPath(sourcePath);
+            if (!normalizedSourcePath.StartsWith(
+                    backupRoot,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException(
+                    "A legacy script resolved outside the migration backup.");
+            }
+
+            string relativePath =
+                normalizedSourcePath.Substring(backupRoot.Length);
+            string placeholderPath = Path.Combine(
+                legacyScriptsPath,
+                relativePath);
+            string placeholderParent = Path.GetDirectoryName(placeholderPath);
+            if (!string.IsNullOrWhiteSpace(placeholderParent))
+                Directory.CreateDirectory(placeholderParent);
+
+            File.WriteAllText(
+                placeholderPath,
+                "// Temporary compile placeholder. Removed when Unity exits." +
+                Environment.NewLine);
+        }
+
+        File.WriteAllText(
+            Path.Combine(
+                legacyScriptsPath,
+                LegacyPlaceholderMarkerName),
+            LegacyPlaceholderMarkerContents + Environment.NewLine);
+    }
+
+    private static LegacyFileMove MoveLegacyGhostMaterialOutOfAssets(
+        string projectRoot)
+    {
+        string legacyAssetPath = ToAbsolutePath(LegacyGhostMaterialPath);
+        if (!File.Exists(legacyAssetPath))
+            return null;
+
+        string assetsRoot = Path.GetFullPath(Application.dataPath)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+        string normalizedAssetPath = Path.GetFullPath(legacyAssetPath);
+        if (!normalizedAssetPath.StartsWith(
+                assetsRoot,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidDataException(
+                "The legacy Ghost Material path resolved outside this project's " +
+                "Assets folder and was not moved.");
+        }
+
+        string actualGuid = AssetDatabase.AssetPathToGUID(
+            LegacyGhostMaterialPath);
+        if (!string.Equals(
+                actualGuid,
+                LegacyGhostMaterialGuid,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            Debug.LogWarning(
+                "[Prefab Components] A Ghost Material exists at the old location, " +
+                "but it does not match the known legacy asset. It was left " +
+                "unchanged for safety.");
+            return null;
+        }
+
+        string timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+        string backupParent = Path.Combine(
+            projectRoot,
+            "Legacy Package Backups",
+            "Wolfy_527 Prefab Components",
+            timestamp + "-" + Guid.NewGuid().ToString("N").Substring(0, 8));
+        string backupAssetPath =
+            Path.Combine(backupParent, "Ghost Material.mat");
+        string legacyMetaPath = normalizedAssetPath + ".meta";
+        string backupMetaPath = backupAssetPath + ".meta";
+
+        Directory.CreateDirectory(backupParent);
+        bool assetMoved = false;
+        try
+        {
+            File.Move(normalizedAssetPath, backupAssetPath);
+            assetMoved = true;
+
+            if (File.Exists(legacyMetaPath))
+                File.Move(legacyMetaPath, backupMetaPath);
+
+            return new LegacyFileMove(
+                normalizedAssetPath,
+                legacyMetaPath,
+                backupAssetPath,
+                backupMetaPath);
+        }
+        catch
+        {
+            if (assetMoved &&
+                File.Exists(backupAssetPath) &&
+                !File.Exists(normalizedAssetPath))
+            {
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(normalizedAssetPath));
+                File.Move(backupAssetPath, normalizedAssetPath);
+            }
+
+            if (File.Exists(backupMetaPath) && !File.Exists(legacyMetaPath))
+                File.Move(backupMetaPath, legacyMetaPath);
+
+            throw;
+        }
+    }
+
+    private static Exception TryRollbackInstall(
+        string targetPackage,
+        string backupPackage,
+        bool newPackageInstalled,
+        bool previousPackageMoved,
+        LegacyFolderMove legacyMove,
+        LegacyFileMove legacyGhostMaterialMove)
+    {
+        try
+        {
+            if (newPackageInstalled && Directory.Exists(targetPackage))
+                Directory.Delete(targetPackage, true);
+
+            if (previousPackageMoved && Directory.Exists(backupPackage))
+                Directory.Move(backupPackage, targetPackage);
+
+            if (legacyMove != null)
+                legacyMove.Restore();
+
+            if (legacyGhostMaterialMove != null)
+                legacyGhostMaterialMove.Restore();
+
+            Client.Resolve();
+            return null;
+        }
+        catch (Exception exception)
+        {
+            return exception;
+        }
+    }
+
+    private static void ExtractPayload(string payloadPath, string destination)
+    {
+        string destinationRoot = Path.GetFullPath(destination)
+            .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        using (FileStream stream = File.OpenRead(payloadPath))
+        using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read))
+        {
+            foreach (ZipArchiveEntry entry in archive.Entries)
+            {
+                string normalizedEntry = entry.FullName
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .Replace('/', Path.DirectorySeparatorChar);
+                string destinationPath = Path.GetFullPath(
+                    Path.Combine(destinationRoot, normalizedEntry));
+
+                if (!destinationPath.StartsWith(
+                        destinationRoot,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidDataException(
+                        $"Fallback payload contains an unsafe path: {entry.FullName}");
+                }
+
+                if (string.IsNullOrEmpty(entry.Name))
+                {
+                    Directory.CreateDirectory(destinationPath);
+                    continue;
+                }
+
+                string parent = Path.GetDirectoryName(destinationPath);
+                if (!string.IsNullOrEmpty(parent))
+                    Directory.CreateDirectory(parent);
+
+                using (Stream input = entry.Open())
+                using (FileStream output = File.Create(destinationPath))
+                    input.CopyTo(output);
+            }
+        }
+    }
+
+    private static bool IsPackageRegistered(string packageName)
+    {
+        PackageInfo[] packages = PackageInfo.GetAllRegisteredPackages();
+        if (packages == null)
+            return false;
+
+        foreach (PackageInfo package in packages)
+        {
+            if (package != null &&
+                string.Equals(
+                    package.name,
+                    packageName,
+                    StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool HasPackageManifest(
+        string assetPath,
+        string expectedName,
+        out string version)
+    {
+        return HasPackageManifestAtAbsolutePath(
+            ToAbsolutePath(assetPath),
+            expectedName,
+            out version);
+    }
+
+    private static bool HasPackageManifestAtAbsolutePath(
+        string packagePath,
+        string expectedName,
+        out string version)
+    {
+        version = null;
+        string manifestPath = Path.Combine(packagePath, "package.json");
+        if (!File.Exists(manifestPath))
+            return false;
+
+        PackageManifest manifest = JsonUtility.FromJson<PackageManifest>(
+            File.ReadAllText(manifestPath));
+        if (manifest == null ||
+            !string.Equals(
+                manifest.name,
+                expectedName,
+                StringComparison.Ordinal) ||
+            string.IsNullOrWhiteSpace(manifest.version))
+        {
+            return false;
+        }
+
+        version = manifest.version;
+        return true;
+    }
+
+    private static bool HasCompatiblePackageGuids(string packageAssetPath)
+    {
+        return
+            HasExpectedAssetGuid(
+                packageAssetPath,
+                LiveMirroringScriptMetaPath,
+                LiveMirroringScriptGuid) &&
+            HasExpectedAssetGuid(
+                packageAssetPath,
+                GeneratedTargetMetadataMetaPath,
+                GeneratedTargetMetadataGuid) &&
+            HasExpectedAssetGuid(
+                packageAssetPath,
+                GeneratedEditorOnlyObjectMetaPath,
+                GeneratedEditorOnlyObjectGuid) &&
+            HasExpectedAssetGuid(
+                packageAssetPath,
+                AuthoringOnlyComponentMetaPath,
+                AuthoringOnlyComponentGuid) &&
+            HasExpectedAssetGuid(
+                packageAssetPath,
+                GhostMaterialMetaPath,
+                LegacyGhostMaterialGuid) &&
+            HasExpectedAssetGuid(
+                packageAssetPath,
+                PawLogoMetaPath,
+                PawLogoGuid);
+    }
+
+    private static bool HasExpectedAssetGuid(
+        string packageAssetPath,
+        string relativeMetaPath,
+        string expectedGuid)
+    {
+        string metaPath = Path.Combine(
+            ToAbsolutePath(packageAssetPath),
+            relativeMetaPath.Replace(
+                '/',
+                Path.DirectorySeparatorChar));
+        if (!File.Exists(metaPath))
+            return false;
+
+        foreach (string line in File.ReadAllLines(metaPath))
+        {
+            string trimmed = line.Trim();
+            if (!trimmed.StartsWith(
+                    "guid:",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            string guid = trimmed.Substring("guid:".Length).Trim();
+            return string.Equals(
+                guid,
+                expectedGuid,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        return false;
+    }
+
+    private static int CompareVersions(string left, string right)
+    {
+        if (!TryParseVersion(left, out Version leftVersion) ||
+            !TryParseVersion(right, out Version rightVersion))
+        {
+            throw new InvalidDataException(
+                $"Cannot compare Prefab Components versions '{left}' and '{right}'.");
+        }
+
+        return leftVersion.CompareTo(rightVersion);
+    }
+
+    private static bool TryParseVersion(string value, out Version version)
+    {
+        version = null;
+        if (string.IsNullOrWhiteSpace(value))
+            return false;
+
+        string core = value.Trim();
+        int suffixIndex = core.IndexOfAny(new[] { '-', '+' });
+        if (suffixIndex >= 0)
+            core = core.Substring(0, suffixIndex);
+
+        string[] parts = core.Split('.');
+        if (parts.Length != 3 ||
+            !int.TryParse(parts[0], out int major) ||
+            !int.TryParse(parts[1], out int minor) ||
+            !int.TryParse(parts[2], out int patch) ||
+            major < 0 ||
+            minor < 0 ||
+            patch < 0)
+        {
+            return false;
+        }
+
+        version = new Version(major, minor, patch);
+        return true;
+    }
+
+    private static void ScheduleInstallerCleanup()
+    {
+        if (cleanupScheduled)
+            return;
+
+        cleanupScheduled = true;
+        EditorApplication.quitting += CleanupInstallerOnExit;
+    }
+
+    private static void CleanupInstallerOnExit()
+    {
+        EditorApplication.quitting -= CleanupInstallerOnExit;
+        cleanupScheduled = false;
+
+        try
+        {
+            CleanupLegacyCompilePlaceholders();
+
+            string installerAbsolutePath = ToAbsolutePath(InstallerRoot);
+            if (Directory.Exists(installerAbsolutePath))
+                Directory.Delete(installerAbsolutePath, true);
+
+            string installerMetaPath = installerAbsolutePath + ".meta";
+            if (File.Exists(installerMetaPath))
+                File.Delete(installerMetaPath);
+        }
+        catch (Exception exception)
+        {
+            Debug.LogWarning(
+                "[Prefab Components] The temporary fallback installer could " +
+                "not remove itself. It is safe to delete manually:\n" +
+                InstallerRoot + "\n" + exception);
+        }
+    }
+
+    private static void CleanupLegacyCompilePlaceholders()
+    {
+        string legacyScriptsPath = ToAbsolutePath(LegacyScriptsPath);
+        if (!Directory.Exists(legacyScriptsPath))
+            return;
+
+        string markerPath = Path.Combine(
+            legacyScriptsPath,
+            LegacyPlaceholderMarkerName);
+        if (!File.Exists(markerPath) ||
+            !string.Equals(
+                File.ReadAllText(markerPath).Trim(),
+                LegacyPlaceholderMarkerContents,
+                StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Directory.Delete(legacyScriptsPath, true);
+
+        string legacyMetaPath = legacyScriptsPath + ".meta";
+        if (File.Exists(legacyMetaPath))
+            File.Delete(legacyMetaPath);
+    }
+
+    private static string ToAbsolutePath(string projectRelativePath)
+    {
+        return Path.GetFullPath(
+            Path.Combine(GetProjectRoot(), projectRelativePath));
+    }
+
+    private static string GetProjectRoot()
+    {
+        DirectoryInfo parent = Directory.GetParent(Application.dataPath);
+        if (parent == null)
+            throw new DirectoryNotFoundException(
+                "Could not locate the Unity project root.");
+
+        return parent.FullName;
+    }
+
+    [Serializable]
+    private sealed class PackageManifest
+    {
+        public string name;
+        public string version;
+    }
+
+    private sealed class LegacyFolderMove
+    {
+        public LegacyFolderMove(
+            string legacyScriptsPath,
+            string legacyMetaPath,
+            string backupScriptsPath,
+            string backupMetaPath)
+        {
+            LegacyScriptsPath = legacyScriptsPath;
+            LegacyMetaPath = legacyMetaPath;
+            BackupScriptsPath = backupScriptsPath;
+            BackupMetaPath = backupMetaPath;
+        }
+
+        public string LegacyScriptsPath { get; }
+        public string LegacyMetaPath { get; }
+        public string BackupScriptsPath { get; }
+        public string BackupMetaPath { get; }
+
+        public void Restore()
+        {
+            if (Directory.Exists(LegacyScriptsPath))
+                Directory.Delete(LegacyScriptsPath, true);
+
+            if (File.Exists(LegacyMetaPath))
+                File.Delete(LegacyMetaPath);
+
+            if (Directory.Exists(BackupScriptsPath) &&
+                !Directory.Exists(LegacyScriptsPath))
+            {
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(LegacyScriptsPath));
+                Directory.Move(BackupScriptsPath, LegacyScriptsPath);
+            }
+
+            if (File.Exists(BackupMetaPath) &&
+                !File.Exists(LegacyMetaPath))
+            {
+                File.Move(BackupMetaPath, LegacyMetaPath);
+            }
+        }
+    }
+
+    private sealed class LegacyFileMove
+    {
+        public LegacyFileMove(
+            string legacyAssetPath,
+            string legacyMetaPath,
+            string backupAssetPath,
+            string backupMetaPath)
+        {
+            LegacyAssetPath = legacyAssetPath;
+            LegacyMetaPath = legacyMetaPath;
+            BackupAssetPath = backupAssetPath;
+            BackupMetaPath = backupMetaPath;
+        }
+
+        public string LegacyAssetPath { get; }
+        public string LegacyMetaPath { get; }
+        public string BackupAssetPath { get; }
+        public string BackupMetaPath { get; }
+
+        public void Restore()
+        {
+            if (File.Exists(LegacyAssetPath))
+                File.Delete(LegacyAssetPath);
+
+            if (File.Exists(LegacyMetaPath))
+                File.Delete(LegacyMetaPath);
+
+            if (File.Exists(BackupAssetPath))
+            {
+                Directory.CreateDirectory(
+                    Path.GetDirectoryName(LegacyAssetPath));
+                File.Move(BackupAssetPath, LegacyAssetPath);
+            }
+
+            if (File.Exists(BackupMetaPath))
+                File.Move(BackupMetaPath, LegacyMetaPath);
+        }
+    }
+}
+}

@@ -13,16 +13,14 @@ VCC repository: `https://wolfy527.github.io/prefab-components/index.json`
 Install `Wolfy_527 - Prefab Components` through VCC.
 
 A standalone Unity package is also available on the
-[Releases](https://github.com/Wolfy527/prefab-components/releases) page. Use one
-installation method per project.
+[Releases](https://github.com/Wolfy527/prefab-components/releases) page. It
+keeps an installed VCC package, updates an older fallback, and does not
+downgrade a newer fallback.
 
 ### Older Glizzy installs
 
-VCC removes the old Scripts folder and Ghost Material automatically.
-
-Before using the standalone package, close Unity and remove
-`Assets/Wolfy_527/~ Supporting Files/Scripts` and the old Ghost Material from
-`Assets`.
+VCC and the standalone installer preserve existing prefab references while
+moving the old Scripts folder and Ghost Material out of `Assets`.
 
 ## Includes
 

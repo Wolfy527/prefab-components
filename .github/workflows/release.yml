@@ -53,47 +53,12 @@ jobs:
             .version == "${{ steps.package.outputs.version }}"
           ' > /dev/null
 
-      - name: Stage standalone Unity package
-        shell: bash
+      - name: Build fallback installer
+        shell: pwsh
         run: |
-          package_root="Packages/${{ steps.package.outputs.name }}"
-          mkdir -p "$package_root"
-          rsync -a ./ "$package_root/" \
-            --exclude ".git" \
-            --exclude ".github" \
-            --exclude ".vpm-listing" \
-            --exclude ".gitignore" \
-            --exclude ".gitattributes" \
-            --exclude "Packages"
-          find "$package_root" -name '*.meta' -type f | sort > unitypackage-meta-list.txt
-
-      - name: Build standalone Unity package
-        shell: bash
-        run: |
-          output="$RUNNER_TEMP/Wolfy_527-Prefab-Components-${{ steps.package.outputs.version }}.unitypackage"
-          staging="$RUNNER_TEMP/unitypackage"
-          mkdir -p "$staging"
-
-          while IFS= read -r meta; do
-            guid="$(awk '/^guid: / { print $2; exit }' "$meta")"
-            if [[ ! "$guid" =~ ^[0-9a-fA-F]{32}$ ]]; then
-              echo "Invalid or missing GUID in $meta"
-              exit 1
-            fi
-
-            asset="${meta%.meta}"
-            entry="$staging/$guid"
-            mkdir -p "$entry"
-            cp "$meta" "$entry/asset.meta"
-            printf '%s' "$asset" > "$entry/pathname"
-
-            if [[ -f "$asset" ]]; then
-              cp "$asset" "$entry/asset"
-            fi
-          done < unitypackage-meta-list.txt
-
-          tar -czf "$output" -C "$staging" .
-          test -s "$output"
+          ./.github/scripts/build-fallback-installer.ps1 `
+            -PackageRoot . `
+            -OutputDirectory "${{ runner.temp }}/fallback"
 
       - name: Create GitHub release
         if: ${{ inputs.publish }}
@@ -109,7 +74,7 @@ jobs:
           gh release create "$tag" \
             "${{ steps.archive.outputs.path }}" \
             "${{ steps.archive.outputs.checksum_path }}" \
-            "${{ runner.temp }}/Wolfy_527-Prefab-Components-${{ steps.package.outputs.version }}.unitypackage" \
+            "${{ runner.temp }}/fallback/Wolfy_527-Prefab-Components-${{ steps.package.outputs.version }}.unitypackage" \
             package.json \
             --target "$GITHUB_SHA" \
             --title "${{ steps.package.outputs.display_name }} ${{ steps.package.outputs.version }}" \

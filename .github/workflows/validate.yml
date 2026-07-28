@@ -18,3 +18,11 @@ jobs:
       - name: Validate manifest and Unity metadata
         shell: pwsh
         run: ./.github/scripts/validate-package.ps1 -PackageRoot . -ExpectedName "com.wolfy527.prefab-components"
+
+      - name: Build fallback installer
+        shell: pwsh
+        run: ./.github/scripts/build-fallback-installer.ps1 -PackageRoot . -OutputDirectory "${{ runner.temp }}/fallback"
+
+      - name: Compile fallback bootstrap
+        shell: pwsh
+        run: ./.github/scripts/test-fallback-bootstrap.ps1 -PackageRoot .
