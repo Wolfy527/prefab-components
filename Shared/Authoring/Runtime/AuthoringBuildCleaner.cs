@@ -1,50 +1,74 @@
+#if UNITY_EDITOR
 namespace Wolfy.PropTools.Customer.Authoring
 {
 using System.Collections.Generic;
 using UnityEngine;
 
-#if UNITY_EDITOR
-using UnityEditor;
-#endif
-
 public static class AuthoringBuildCleaner
 {
-    // Kept independent of individual authoring tools so customer modules remain separable.
-    private static readonly string[] EditorOnlyObjectNames =
+    public struct CleanupReport
     {
-        "EDITOR ONLY - Live Mirroring"
-    };
+        public int ComponentsRemoved;
+        public int GameObjectsRemoved;
 
-    public static void StripAuthoringComponentsFrom(GameObject root)
+        public bool HasChanges =>
+            ComponentsRemoved > 0 || GameObjectsRemoved > 0;
+    }
+
+    public static CleanupReport StripAuthoringComponentsFrom(GameObject root)
     {
 #if UNITY_EDITOR
         if (root == null)
-            return;
+            return default;
+        if (!root.scene.IsValid())
+        {
+            Debug.LogError(
+                "Prefab Components refused to strip authoring data directly " +
+                "from an asset. Run cleanup on a scene or upload copy instead.",
+                root);
+            return default;
+        }
 
-        HashSet<GameObject> generatedEditorOnlyObjects;
+        int componentCount;
         HashSet<GameObject> generatedObjectsToRemove;
-        StripComponents(root, out generatedEditorOnlyObjects, out generatedObjectsToRemove);
+        StripComponents(
+            root,
+            out generatedObjectsToRemove,
+            out componentCount);
         RemoveGeneratedObjects(generatedObjectsToRemove);
 
-        if (root == null)
-            return;
-
-        RemoveEmptyEditorOnlyObjects(root.transform, generatedEditorOnlyObjects);
-
-        EditorUtility.SetDirty(root);
+        return new CleanupReport
+        {
+            ComponentsRemoved = componentCount,
+            GameObjectsRemoved = generatedObjectsToRemove.Count
+        };
+#else
+        return default;
 #endif
     }
 
 #if UNITY_EDITOR
+    public static void StripAuthoringComponent(
+        AuthoringOnlyComponent component)
+    {
+        if (component == null)
+            return;
+
+        if (component.RemoveGameObjectWithComponent)
+            UnityEngine.Object.DestroyImmediate(component.gameObject, true);
+        else
+            UnityEngine.Object.DestroyImmediate(component, true);
+    }
+
     private static void StripComponents(
         GameObject root,
-        out HashSet<GameObject> generatedEditorOnlyObjects,
-        out HashSet<GameObject> generatedObjectsToRemove)
+        out HashSet<GameObject> generatedObjectsToRemove,
+        out int componentCount)
     {
-        generatedEditorOnlyObjects = new HashSet<GameObject>();
         generatedObjectsToRemove = new HashSet<GameObject>();
         AuthoringOnlyComponent[] components =
             root.GetComponentsInChildren<AuthoringOnlyComponent>(true);
+        componentCount = components.Length;
 
         foreach (AuthoringOnlyComponent component in components)
         {
@@ -53,8 +77,8 @@ public static class AuthoringBuildCleaner
 
             if (component.RemoveGameObjectWithComponent)
             {
-                generatedEditorOnlyObjects.Add(component.gameObject);
                 generatedObjectsToRemove.Add(component.gameObject);
+                continue;
             }
 
             UnityEngine.Object.DestroyImmediate(component, true);
@@ -73,45 +97,7 @@ public static class AuthoringBuildCleaner
         }
     }
 
-    private static void RemoveEmptyEditorOnlyObjects(
-        Transform root,
-        HashSet<GameObject> generatedEditorOnlyObjects)
-    {
-        if (root == null)
-            return;
-
-        for (int i = root.childCount - 1; i >= 0; i--)
-            RemoveEmptyEditorOnlyObjects(root.GetChild(i), generatedEditorOnlyObjects);
-
-        bool isGeneratedEditorOnlyObject =
-            generatedEditorOnlyObjects != null && generatedEditorOnlyObjects.Contains(root.gameObject);
-
-        if (!isGeneratedEditorOnlyObject && !IsEditorOnlyObjectName(root.name))
-            return;
-
-        if (root.childCount > 0)
-            return;
-
-        Component[] components = root.GetComponents<Component>();
-
-        // Transform is always present. If only Transform remains, the object is safe to remove.
-        if (components.Length > 1)
-            return;
-
-        UnityEngine.Object.DestroyImmediate(root.gameObject, true);
-    }
-
-    private static bool IsEditorOnlyObjectName(string objectName)
-    {
-        foreach (string editorOnlyName in EditorOnlyObjectNames)
-        {
-            if (objectName == editorOnlyName)
-                return true;
-        }
-
-        return false;
-    }
-
 #endif
 }
 }
+#endif

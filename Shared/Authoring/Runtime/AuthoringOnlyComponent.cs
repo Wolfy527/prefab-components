@@ -60,7 +60,7 @@ public abstract class AuthoringOnlyComponent : MonoBehaviour
     public virtual bool OnPreprocess()
     {
 #if UNITY_EDITOR
-        AuthoringBuildCleaner.StripAuthoringComponentsFrom(gameObject);
+        AuthoringBuildCleaner.StripAuthoringComponent(this);
 #endif
         return true;
     }

@@ -4,9 +4,10 @@ using Wolfy.PropTools.Customer.Authoring;
 
 #if UNITY_EDITOR && VRC_SDK_VRCSDK3
 
-using UnityEditor;
+using System.Diagnostics;
 using UnityEngine;
 using VRC.SDKBase.Editor.BuildPipeline;
+using Debug = UnityEngine.Debug;
 
 public class AuthoringUploadStripper : IVRCSDKPreprocessAvatarCallback
 {
@@ -17,8 +18,21 @@ public class AuthoringUploadStripper : IVRCSDKPreprocessAvatarCallback
         if (avatarGameObject == null)
             return true;
 
-        AuthoringBuildCleaner.StripAuthoringComponentsFrom(avatarGameObject);
-        EditorUtility.SetDirty(avatarGameObject);
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        AuthoringBuildCleaner.CleanupReport report =
+            AuthoringBuildCleaner.StripAuthoringComponentsFrom(
+                avatarGameObject);
+        stopwatch.Stop();
+
+        if (report.HasChanges)
+        {
+            Debug.Log(
+                $"[Prefab Components Timing] Upload cleanup removed " +
+                $"{report.ComponentsRemoved} authoring component(s) and " +
+                $"{report.GameObjectsRemoved} generated object(s) in " +
+                $"{stopwatch.Elapsed.TotalMilliseconds:F2} ms.",
+                avatarGameObject);
+        }
 
         return true;
     }

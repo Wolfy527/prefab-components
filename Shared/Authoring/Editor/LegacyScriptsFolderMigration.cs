@@ -1,6 +1,7 @@
 namespace Wolfy.PropTools.Customer.Authoring.Editor
 {
 using System;
+using System.Collections.Generic;
 using System.IO;
 using UnityEditor;
 using UnityEngine;
@@ -16,14 +17,24 @@ internal static class LegacyScriptsFolderMigration
         "Assets/Wolfy_527/~ Supporting Files/Ghost Material.mat";
     private const string LegacyGhostMaterialGuid =
         "4342400023fc9204e9fab7239dec44ef";
+    private const string LiveMirroringScriptGuid =
+        "5c54d508ba4a3ee4baa5148633885b51";
+    private const string GeneratedTargetMetadataGuid =
+        "48742d3549a555842844b99523feab8f";
+    private const string AuthoringOnlyComponentGuid =
+        "40218417691f9c041a2ac01d1b9d1a5c";
     private const string PlaceholderMarkerName =
         "Prefab Components Migration Placeholder.txt";
     private const string PlaceholderMarkerContents =
         "Wolfy_527 Prefab Components migration placeholder";
+    private const string PlaceholderScriptContents =
+        "// Prefab Components migration placeholder. Intentionally inert.";
     private const string InstallerRoot =
         "Assets/Wolfy_527/~ Supporting Files/Prefab Components Installer";
-    private const string InstallerRootGuid =
-        "d9ad23fa951c4b14bfc93923b7f36b0e";
+    private const string InstallerPayloadPath =
+        InstallerRoot + "/PrefabComponentsFallback.bytes";
+    private const string InstallerPayloadGuid =
+        "33bd79b26cc644e4896285530a240b2b";
     private const string BuilderPackagePath =
         "Packages/com.wolfy527.prefab-builder";
     private const double CleanupQuietSeconds = 5.0;
@@ -205,11 +216,39 @@ internal static class LegacyScriptsFolderMigration
     private static bool IsRecognizedLegacyScripts(string legacyScriptsPath)
     {
         string actualGuid = AssetDatabase.AssetPathToGUID(LegacyScriptsPath);
-        return string.Equals(
+        if (string.Equals(
                    actualGuid,
                    LegacyScriptsGuid,
-                   StringComparison.OrdinalIgnoreCase) ||
-               Directory.Exists(Path.Combine(legacyScriptsPath, "Customer"));
+                   StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        HashSet<string> expectedGuids = new HashSet<string>(
+            new[]
+            {
+                LiveMirroringScriptGuid,
+                GeneratedTargetMetadataGuid,
+                AuthoringOnlyComponentGuid
+            },
+            StringComparer.OrdinalIgnoreCase
+        );
+        int matches = 0;
+
+        foreach (string metaPath in Directory.GetFiles(
+                     legacyScriptsPath,
+                     "*.meta",
+                     SearchOption.AllDirectories))
+        {
+            string guid = ReadMetaGuid(metaPath);
+            if (!string.IsNullOrWhiteSpace(guid) &&
+                expectedGuids.Remove(guid))
+            {
+                matches++;
+            }
+        }
+
+        return matches >= 2;
     }
 
     private static void CreateCompilePlaceholders(
@@ -246,8 +285,7 @@ internal static class LegacyScriptsFolderMigration
 
             File.WriteAllText(
                 placeholderPath,
-                "// Temporary compile placeholder. Removed when Unity exits." +
-                Environment.NewLine);
+                PlaceholderScriptContents + Environment.NewLine);
         }
 
         File.WriteAllText(
@@ -307,7 +345,6 @@ internal static class LegacyScriptsFolderMigration
         cleanupQuietSince = EditorApplication.timeSinceStartup;
         EditorApplication.update += TryCleanupTemporaryAssets;
         EditorApplication.projectChanged += ResetCleanupQuietPeriod;
-        EditorApplication.quitting += CleanupPlaceholdersOnExit;
     }
 
     private static void TryCleanupTemporaryAssets()
@@ -324,7 +361,6 @@ internal static class LegacyScriptsFolderMigration
 
         EditorApplication.update -= TryCleanupTemporaryAssets;
         EditorApplication.projectChanged -= ResetCleanupQuietPeriod;
-        EditorApplication.quitting -= CleanupPlaceholdersOnExit;
         cleanupScheduled = false;
 
         bool cleanupFailed = false;
@@ -333,20 +369,8 @@ internal static class LegacyScriptsFolderMigration
         if (string.IsNullOrWhiteSpace(projectRoot))
             return;
 
-        string legacyScriptsPath = Path.GetFullPath(
-            Path.Combine(projectRoot, LegacyScriptsPath));
-        string markerPath = Path.Combine(
-            legacyScriptsPath,
-            PlaceholderMarkerName);
-        bool hasPlaceholders = IsOwnedPlaceholder(markerPath);
-
         if (!IsBuilderInstalled(projectRoot) &&
-            AssetDatabase.IsValidFolder(InstallerRoot) &&
-            string.Equals(
-                AssetDatabase.AssetPathToGUID(InstallerRoot),
-                InstallerRootGuid,
-                StringComparison.OrdinalIgnoreCase) &&
-            !AssetDatabase.DeleteAsset(InstallerRoot))
+            !CleanupOwnedInstallerPayload())
         {
             cleanupFailed = true;
         }
@@ -357,69 +381,12 @@ internal static class LegacyScriptsFolderMigration
             cleanupQuietSince = EditorApplication.timeSinceStartup;
             EditorApplication.update += TryCleanupTemporaryAssets;
             EditorApplication.projectChanged += ResetCleanupQuietPeriod;
-            EditorApplication.quitting += CleanupPlaceholdersOnExit;
-        }
-        else if (hasPlaceholders)
-        {
-            // Unity's incremental compiler can retain source paths from the
-            // import that introduced the legacy scripts. Removing those paths
-            // in the same session produces transient CS2001 errors even after
-            // compilation appears idle. The placeholders are empty and inert,
-            // so remove them safely while Unity is closing instead.
-            EditorApplication.quitting += CleanupPlaceholdersOnExit;
         }
     }
 
     private static void ResetCleanupQuietPeriod()
     {
         cleanupQuietSince = EditorApplication.timeSinceStartup;
-    }
-
-    private static void CleanupPlaceholdersOnExit()
-    {
-        EditorApplication.update -= TryCleanupTemporaryAssets;
-        EditorApplication.projectChanged -= ResetCleanupQuietPeriod;
-        EditorApplication.quitting -= CleanupPlaceholdersOnExit;
-        cleanupScheduled = false;
-
-        try
-        {
-            string projectRoot =
-                Directory.GetParent(Application.dataPath)?.FullName;
-            if (string.IsNullOrWhiteSpace(projectRoot))
-                return;
-
-            string legacyScriptsPath = Path.GetFullPath(
-                Path.Combine(projectRoot, LegacyScriptsPath));
-            string markerPath = Path.Combine(
-                legacyScriptsPath,
-                PlaceholderMarkerName);
-            if (IsOwnedPlaceholder(markerPath))
-            {
-                Directory.Delete(legacyScriptsPath, true);
-                string legacyMetaPath = legacyScriptsPath + ".meta";
-                if (File.Exists(legacyMetaPath))
-                    File.Delete(legacyMetaPath);
-            }
-
-            string installerPath = Path.GetFullPath(
-                Path.Combine(projectRoot, InstallerRoot));
-            if (!IsBuilderInstalled(projectRoot) &&
-                IsOwnedInstallerDirectory(installerPath))
-            {
-                Directory.Delete(installerPath, true);
-                string installerMetaPath = installerPath + ".meta";
-                if (File.Exists(installerMetaPath))
-                    File.Delete(installerMetaPath);
-            }
-        }
-        catch (Exception exception)
-        {
-            Debug.LogWarning(
-                "[Wolfy_527 - Prefab Components] Temporary migration " +
-                "placeholders could not be removed. They are safe to delete " +
-                "manually after Unity closes.\n" + exception);
-        }
     }
 
     private static bool IsOwnedPlaceholder(string markerPath)
@@ -431,32 +398,47 @@ internal static class LegacyScriptsFolderMigration
                    StringComparison.Ordinal);
     }
 
-    private static bool IsOwnedInstallerDirectory(string installerPath)
+    private static bool CleanupOwnedInstallerPayload()
     {
-        if (!Directory.Exists(installerPath))
+        string projectRoot =
+            Directory.GetParent(Application.dataPath)?.FullName;
+        if (string.IsNullOrWhiteSpace(projectRoot))
             return false;
 
-        string metaPath = installerPath + ".meta";
+        string payloadPath = Path.GetFullPath(
+            Path.Combine(projectRoot, InstallerPayloadPath));
+        if (!File.Exists(payloadPath))
+            return true;
+
+        if (!string.Equals(
+                AssetDatabase.AssetPathToGUID(InstallerPayloadPath),
+                InstallerPayloadGuid,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return AssetDatabase.DeleteAsset(InstallerPayloadPath) ||
+               !File.Exists(payloadPath);
+    }
+
+    private static string ReadMetaGuid(string metaPath)
+    {
         if (!File.Exists(metaPath))
-            return false;
+            return string.Empty;
 
-        foreach (string line in File.ReadAllLines(metaPath))
+        foreach (string line in File.ReadLines(metaPath))
         {
             string trimmed = line.Trim();
-            if (!trimmed.StartsWith(
+            if (trimmed.StartsWith(
                     "guid:",
                     StringComparison.OrdinalIgnoreCase))
             {
-                continue;
+                return trimmed.Substring("guid:".Length).Trim();
             }
-
-            return string.Equals(
-                trimmed.Substring("guid:".Length).Trim(),
-                InstallerRootGuid,
-                StringComparison.OrdinalIgnoreCase);
         }
 
-        return false;
+        return string.Empty;
     }
 
     private static bool IsBuilderInstalled(string projectRoot)

@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 namespace Wolfy.PropTools.Customer.LiveMirroring
 {
 using Wolfy.PropTools.Customer.Authoring;
@@ -34,3 +35,4 @@ public static class LiveMirroringMigrationService
     }
 }
 }
+#endif

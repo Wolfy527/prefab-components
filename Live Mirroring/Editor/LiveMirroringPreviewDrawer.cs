@@ -12,6 +12,7 @@ using UnityEngine.Rendering;
 public static class LiveMirroringPreviewDrawer
 {
     private const double SystemDiscoveryInterval = 5.0;
+    private const int MaximumPreviewInstances = 128;
 
     private class PreviewState
     {
@@ -84,14 +85,20 @@ public static class LiveMirroringPreviewDrawer
                 states[id] = state;
             }
 
-            LiveMirroringService.CollectAllTargets(
+            CollectPreviewTargets(
                 system,
                 state.collectedTargets,
                 state.collectedTargetSet
             );
 
-            // Keep scale-dependent target data current before preview ghosts read target transforms.
-            LiveMirroringService.ApplyScaleReference(system, state.collectedTargets);
+            // Previewing must not mutate authored targets while live mirroring
+            // itself is disabled.
+            if (system.liveMirror)
+            {
+                LiveMirroringService.ApplyScaleReference(
+                    system,
+                    state.collectedTargets);
+            }
 
             bool needsRebuild =
                 state.source != system.previewSource ||
@@ -132,6 +139,41 @@ public static class LiveMirroringPreviewDrawer
         }
 
         return true;
+    }
+
+    private static void CollectPreviewTargets(
+        LiveMirroringSystem system,
+        List<Transform> output,
+        HashSet<Transform> seen)
+    {
+        output.Clear();
+        seen.Clear();
+        if (system?.pairs == null)
+            return;
+
+        foreach (LiveMirroringSystem.MirrorPair pair in system.pairs)
+        {
+            if (pair == null)
+                continue;
+
+            AddPreviewTarget(pair.sourceTarget, output, seen);
+            AddPreviewTarget(pair.mirroredTarget, output, seen);
+            if (output.Count >= MaximumPreviewInstances)
+                return;
+        }
+    }
+
+    private static void AddPreviewTarget(
+        Transform target,
+        ICollection<Transform> output,
+        ISet<Transform> seen)
+    {
+        if (target != null &&
+            output.Count < MaximumPreviewInstances &&
+            seen.Add(target))
+        {
+            output.Add(target);
+        }
     }
 
     private static void RebuildState(
@@ -237,7 +279,17 @@ public static class LiveMirroringPreviewDrawer
         GameObject instance,
         bool created)
     {
-        if (contributor == null || failedContributors.Contains(contributor.ContributorId))
+        if (contributor == null)
+            return;
+
+        string contributorId = string.IsNullOrWhiteSpace(
+            contributor.ContributorId)
+            ? contributor.GetType().FullName
+            : contributor.ContributorId;
+        string failureKey =
+            contributorId + ":" +
+            (system != null ? system.GetInstanceID().ToString() : "Missing");
+        if (failedContributors.Contains(failureKey))
             return;
 
         try
@@ -252,7 +304,7 @@ public static class LiveMirroringPreviewDrawer
         }
         catch (System.Exception exception)
         {
-            failedContributors.Add(contributor.ContributorId);
+            failedContributors.Add(failureKey);
             Debug.LogException(exception, system);
         }
     }

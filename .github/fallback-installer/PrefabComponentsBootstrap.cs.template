@@ -1,8 +1,10 @@
 namespace Wolfy527.PrefabComponentsFallbackInstaller
 {
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.PackageManager;
 using UnityEngine;
@@ -17,11 +19,12 @@ internal static class PrefabComponentsBootstrap
         "com.wolfy527.prefab-components.fallback";
     private const string BuilderPackageName =
         "com.wolfy527.prefab-builder";
-    private const string BundledVersion = "@@BUNDLED_VERSION@@";
     private const string UpdateWarningSessionKeyPrefix =
         "Wolfy527.PrefabComponents.UpdateWarning.";
     private const string InstallerRoot =
         "Assets/Wolfy_527/~ Supporting Files/Prefab Components Installer";
+    private const string InstallerPayloadGuid =
+        "33bd79b26cc644e4896285530a240b2b";
     private const string PayloadPath =
         InstallerRoot + "/PrefabComponentsFallback.bytes";
     private const string FallbackPackagePath =
@@ -34,6 +37,8 @@ internal static class PrefabComponentsBootstrap
         "Prefab Components Migration Placeholder.txt";
     private const string LegacyPlaceholderMarkerContents =
         "Wolfy_527 Prefab Components migration placeholder";
+    private const string LegacyPlaceholderScriptContents =
+        "// Prefab Components migration placeholder. Intentionally inert.";
     private const string LegacyGhostMaterialPath =
         "Assets/Wolfy_527/~ Supporting Files/Ghost Material.mat";
     private const string LegacyGhostMaterialGuid =
@@ -63,9 +68,16 @@ internal static class PrefabComponentsBootstrap
 
     private static bool running;
     private static bool cleanupScheduled;
+    private static string bundledVersion;
 
     static PrefabComponentsBootstrap()
     {
+        ScheduleRun();
+    }
+
+    internal static void ScheduleRun()
+    {
+        EditorApplication.delayCall -= Run;
         EditorApplication.delayCall += Run;
     }
 
@@ -85,6 +97,8 @@ internal static class PrefabComponentsBootstrap
         running = true;
         try
         {
+            bundledVersion = ReadBundledVersion(ToAbsolutePath(PayloadPath));
+
             bool hasManagedPackage = TryGetRegisteredPackageVersion(
                 ManagedPackageName,
                 out string managedVersion);
@@ -98,12 +112,12 @@ internal static class PrefabComponentsBootstrap
 
             if (hasManagedPackage)
             {
-                if (CompareVersions(managedVersion, BundledVersion) < 0)
+                if (CompareVersions(managedVersion, bundledVersion) < 0)
                     ScheduleManagedPackageUpdateWarning(managedVersion);
 
                 Debug.Log(
                     $"[Prefab Components] VCC package {managedVersion} is already " +
-                    $"installed. Bundled fallback {BundledVersion} was not imported.");
+                    $"installed. Bundled fallback {bundledVersion} was not imported.");
                 ScheduleInstallerCleanup();
                 return;
             }
@@ -123,7 +137,7 @@ internal static class PrefabComponentsBootstrap
             }
 
             int installedVersionComparison = hasFallbackPackage
-                ? CompareVersions(installedVersion, BundledVersion)
+                ? CompareVersions(installedVersion, bundledVersion)
                 : -1;
             bool fallbackGuidIsCompatible =
                 !hasFallbackPackage ||
@@ -135,7 +149,7 @@ internal static class PrefabComponentsBootstrap
             {
                 Debug.Log(
                     $"[Prefab Components] Fallback {installedVersion} is already " +
-                    $"installed. Bundled fallback {BundledVersion} was skipped.");
+                    $"installed. Bundled fallback {bundledVersion} was skipped.");
                 ScheduleInstallerCleanup();
                 return;
             }
@@ -146,7 +160,7 @@ internal static class PrefabComponentsBootstrap
             {
                 throw new InvalidDataException(
                     $"Fallback {installedVersion} has incompatible compatibility " +
-                    $"GUIDs. Bundled fallback {BundledVersion} is " +
+                    $"GUIDs. Bundled fallback {bundledVersion} is " +
                     "older and will not overwrite it.");
             }
 
@@ -200,12 +214,12 @@ internal static class PrefabComponentsBootstrap
 
             if (!string.Equals(
                     payloadVersion,
-                    BundledVersion,
+                    bundledVersion,
                     StringComparison.Ordinal))
             {
                 throw new InvalidDataException(
                     $"Fallback payload version {payloadVersion} does not match " +
-                    $"installer version {BundledVersion}.");
+                    $"installer version {bundledVersion}.");
             }
 
             // Remove the known legacy source tree before the fallback package
@@ -236,12 +250,12 @@ internal static class PrefabComponentsBootstrap
             string action;
             if (string.IsNullOrWhiteSpace(installedVersion))
                 action = "Installed";
-            else if (CompareVersions(installedVersion, BundledVersion) == 0)
+            else if (CompareVersions(installedVersion, bundledVersion) == 0)
                 action = "Repaired";
             else
                 action = $"Updated from {installedVersion} to";
             Debug.Log(
-                $"[Prefab Components] {action} fallback {BundledVersion}. " +
+                $"[Prefab Components] {action} fallback {bundledVersion}. " +
                 "Install the VCC package later for managed updates.");
 
             if (legacyMove != null)
@@ -312,10 +326,8 @@ internal static class PrefabComponentsBootstrap
             actualGuid,
             LegacyScriptsGuid,
             StringComparison.OrdinalIgnoreCase);
-        bool hasLegacyCustomerFolder = Directory.Exists(
-            Path.Combine(normalizedLegacyPath, "Customer"));
-
-        if (!hasExpectedGuid && !hasLegacyCustomerFolder)
+        if (!hasExpectedGuid &&
+            !HasRecognizedLegacyScriptSignatures(normalizedLegacyPath))
         {
             throw new InvalidDataException(
                 "A Scripts folder exists at the old Prefab Components location, " +
@@ -404,8 +416,7 @@ internal static class PrefabComponentsBootstrap
 
             File.WriteAllText(
                 placeholderPath,
-                "// Temporary compile placeholder. Removed when Unity exits." +
-                Environment.NewLine);
+                LegacyPlaceholderScriptContents + Environment.NewLine);
         }
 
         File.WriteAllText(
@@ -413,6 +424,36 @@ internal static class PrefabComponentsBootstrap
                 legacyScriptsPath,
                 LegacyPlaceholderMarkerName),
             LegacyPlaceholderMarkerContents + Environment.NewLine);
+    }
+
+    private static bool HasRecognizedLegacyScriptSignatures(
+        string legacyScriptsPath)
+    {
+        HashSet<string> expectedGuids = new HashSet<string>(
+            new[]
+            {
+                LiveMirroringScriptGuid,
+                GeneratedTargetMetadataGuid,
+                AuthoringOnlyComponentGuid
+            },
+            StringComparer.OrdinalIgnoreCase
+        );
+        int matches = 0;
+
+        foreach (string metaPath in Directory.GetFiles(
+                     legacyScriptsPath,
+                     "*.meta",
+                     SearchOption.AllDirectories))
+        {
+            string guid = ReadMetaGuid(metaPath);
+            if (!string.IsNullOrWhiteSpace(guid) &&
+                expectedGuids.Remove(guid))
+            {
+                matches++;
+            }
+        }
+
+        return matches >= 2;
     }
 
     private static LegacyFileMove MoveLegacyGhostMaterialOutOfAssets(
@@ -567,6 +608,44 @@ internal static class PrefabComponentsBootstrap
         }
     }
 
+    private static string ReadBundledVersion(string payloadPath)
+    {
+        using (FileStream stream = File.OpenRead(payloadPath))
+        using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read))
+        {
+            ZipArchiveEntry manifestEntry = archive.Entries.FirstOrDefault(
+                entry => string.Equals(
+                    entry.FullName.Replace('\\', '/').TrimStart('/'),
+                    "package.json",
+                    StringComparison.OrdinalIgnoreCase));
+            if (manifestEntry == null || manifestEntry.Length > 65536)
+            {
+                throw new InvalidDataException(
+                    "The fallback payload does not contain a valid package manifest.");
+            }
+
+            string manifestJson;
+            using (Stream input = manifestEntry.Open())
+            using (StreamReader reader = new StreamReader(input))
+                manifestJson = reader.ReadToEnd();
+
+            PackageManifest manifest =
+                JsonUtility.FromJson<PackageManifest>(manifestJson);
+            if (manifest == null ||
+                !string.Equals(
+                    manifest.name,
+                    FallbackPackageName,
+                    StringComparison.Ordinal) ||
+                !TryParseVersion(manifest.version, out _))
+            {
+                throw new InvalidDataException(
+                    "The fallback payload package manifest is invalid.");
+            }
+
+            return manifest.version;
+        }
+    }
+
     private static bool IsPackageRegistered(string packageName)
     {
         PackageInfo[] packages = PackageInfo.GetAllRegisteredPackages();
@@ -618,14 +697,14 @@ internal static class PrefabComponentsBootstrap
     private static void ScheduleManagedPackageUpdateWarning(
         string installedVersion)
     {
-        string sessionKey = UpdateWarningSessionKeyPrefix + BundledVersion;
+        string sessionKey = UpdateWarningSessionKeyPrefix + bundledVersion;
         if (SessionState.GetBool(sessionKey, false))
             return;
 
         SessionState.SetBool(sessionKey, true);
         Debug.LogWarning(
             $"[Prefab Components] An imported asset requires Prefab Components " +
-            $"{BundledVersion} or newer, but VCC package {installedVersion} is " +
+            $"{bundledVersion} or newer, but VCC package {installedVersion} is " +
             "installed. Update Prefab Components through VCC.");
 
         EditorApplication.delayCall += () =>
@@ -633,7 +712,7 @@ internal static class PrefabComponentsBootstrap
                 "Prefab Components Update Required",
                 "An imported asset requires a newer Prefab Components package." +
                 $"\n\nInstalled VCC version: {installedVersion}" +
-                $"\nRequired version: {BundledVersion} or newer" +
+                $"\nRequired version: {bundledVersion} or newer" +
                 "\n\nUpdate " +
                 "Wolfy_527 - Prefab Components through VCC before using this asset.",
                 "OK");
@@ -783,58 +862,49 @@ internal static class PrefabComponentsBootstrap
             return;
 
         cleanupScheduled = true;
-        EditorApplication.quitting += CleanupInstallerOnExit;
+        EditorApplication.delayCall += CleanupInstallerPayload;
     }
 
-    private static void CleanupInstallerOnExit()
+    private static void CleanupInstallerPayload()
     {
-        EditorApplication.quitting -= CleanupInstallerOnExit;
+        EditorApplication.delayCall -= CleanupInstallerPayload;
         cleanupScheduled = false;
 
         try
         {
-            CleanupLegacyCompilePlaceholders();
-
-            string installerAbsolutePath = ToAbsolutePath(InstallerRoot);
-            if (Directory.Exists(installerAbsolutePath))
-                Directory.Delete(installerAbsolutePath, true);
-
-            string installerMetaPath = installerAbsolutePath + ".meta";
-            if (File.Exists(installerMetaPath))
-                File.Delete(installerMetaPath);
+            if (string.Equals(
+                    AssetDatabase.AssetPathToGUID(PayloadPath),
+                    InstallerPayloadGuid,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                AssetDatabase.DeleteAsset(PayloadPath);
+            }
         }
         catch (Exception exception)
         {
             Debug.LogWarning(
-                "[Prefab Components] The temporary fallback installer could " +
-                "not remove itself. It is safe to delete manually:\n" +
-                InstallerRoot + "\n" + exception);
+                "[Prefab Components] The temporary fallback payload could not " +
+                "be removed. It is safe to leave in place.\n" + exception);
         }
     }
 
-    private static void CleanupLegacyCompilePlaceholders()
+    private static string ReadMetaGuid(string metaPath)
     {
-        string legacyScriptsPath = ToAbsolutePath(LegacyScriptsPath);
-        if (!Directory.Exists(legacyScriptsPath))
-            return;
+        if (!File.Exists(metaPath))
+            return string.Empty;
 
-        string markerPath = Path.Combine(
-            legacyScriptsPath,
-            LegacyPlaceholderMarkerName);
-        if (!File.Exists(markerPath) ||
-            !string.Equals(
-                File.ReadAllText(markerPath).Trim(),
-                LegacyPlaceholderMarkerContents,
-                StringComparison.Ordinal))
+        foreach (string line in File.ReadLines(metaPath))
         {
-            return;
+            string trimmed = line.Trim();
+            if (trimmed.StartsWith(
+                    "guid:",
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return trimmed.Substring("guid:".Length).Trim();
+            }
         }
 
-        Directory.Delete(legacyScriptsPath, true);
-
-        string legacyMetaPath = legacyScriptsPath + ".meta";
-        if (File.Exists(legacyMetaPath))
-            File.Delete(legacyMetaPath);
+        return string.Empty;
     }
 
     private static string ToAbsolutePath(string projectRelativePath)
@@ -939,6 +1009,38 @@ internal static class PrefabComponentsBootstrap
 
             if (File.Exists(BackupMetaPath))
                 File.Move(BackupMetaPath, LegacyMetaPath);
+        }
+    }
+}
+
+internal sealed class PrefabComponentsInstallerAssetPostprocessor :
+    AssetPostprocessor
+{
+    private const string PayloadPath =
+        "Assets/Wolfy_527/~ Supporting Files/Prefab Components Installer/" +
+        "PrefabComponentsFallback.bytes";
+
+    private static void OnPostprocessAllAssets(
+        string[] importedAssets,
+        string[] deletedAssets,
+        string[] movedAssets,
+        string[] movedFromAssetPaths)
+    {
+        if (importedAssets == null)
+            return;
+
+        foreach (string importedAsset in importedAssets)
+        {
+            if (!string.Equals(
+                    importedAsset,
+                    PayloadPath,
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            PrefabComponentsBootstrap.ScheduleRun();
+            return;
         }
     }
 }

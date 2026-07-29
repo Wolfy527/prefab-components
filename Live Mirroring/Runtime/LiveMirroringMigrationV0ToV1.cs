@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 namespace Wolfy.PropTools.Customer.LiveMirroring
 {
 using Wolfy.PropTools.Customer.Authoring;
@@ -26,3 +27,4 @@ internal sealed class LiveMirroringMigrationV0ToV1 :
     }
 }
 }
+#endif

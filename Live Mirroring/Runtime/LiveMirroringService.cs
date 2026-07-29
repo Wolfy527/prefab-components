@@ -1,3 +1,4 @@
+#if UNITY_EDITOR
 namespace Wolfy.PropTools.Customer.LiveMirroring
 {
 using Wolfy.PropTools.Customer.Authoring;
@@ -120,6 +121,8 @@ public static class LiveMirroringService
             return output;
 
         HashSet<Transform> controlledMirroredTargets = new HashSet<Transform>();
+        Dictionary<Transform, List<Transform>> edges =
+            new Dictionary<Transform, List<Transform>>();
 
         foreach (LiveMirroringSystem.MirrorPair pair in system.pairs)
         {
@@ -133,10 +136,68 @@ public static class LiveMirroringService
                 continue;
             }
 
+            if (WouldCreateCycle(
+                    pair.sourceTarget,
+                    pair.mirroredTarget,
+                    edges))
+            {
+                controlledMirroredTargets.Remove(pair.mirroredTarget);
+                continue;
+            }
+
+            AddEdge(
+                edges,
+                pair.sourceTarget,
+                pair.mirroredTarget);
             output.Add(pair);
         }
 
         return output;
+    }
+
+    private static bool WouldCreateCycle(
+        Transform source,
+        Transform mirrored,
+        IReadOnlyDictionary<Transform, List<Transform>> edges)
+    {
+        HashSet<Transform> visited = new HashSet<Transform>();
+        Stack<Transform> pending = new Stack<Transform>();
+        pending.Push(mirrored);
+
+        while (pending.Count > 0)
+        {
+            Transform current = pending.Pop();
+            if (current == null || !visited.Add(current))
+                continue;
+            if (current == source)
+                return true;
+
+            if (!edges.TryGetValue(
+                    current,
+                    out List<Transform> next))
+                continue;
+
+            foreach (Transform target in next)
+                pending.Push(target);
+        }
+
+        return false;
+    }
+
+    private static void AddEdge(
+        IDictionary<Transform, List<Transform>> edges,
+        Transform source,
+        Transform mirrored)
+    {
+        if (!edges.TryGetValue(
+                source,
+                out List<Transform> targets))
+        {
+            targets = new List<Transform>();
+            edges.Add(source, targets);
+        }
+
+        targets.Add(mirrored);
     }
 
     private static void MirrorPair(
@@ -243,3 +304,4 @@ public static class LiveMirroringService
     }
 }
 }
+#endif

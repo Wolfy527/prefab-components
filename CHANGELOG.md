@@ -1,5 +1,5 @@
 # Changelog
 
-## 1.0.16
+## 1.0.21
 
-- Warns when an imported asset requires a newer VCC package.
+- Reduced player compilation work while preserving Live Mirroring and upload cleanup.

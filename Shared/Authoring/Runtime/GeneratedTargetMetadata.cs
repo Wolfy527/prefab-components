@@ -22,7 +22,11 @@ public class GeneratedTargetMetadata : AuthoringOnlyComponent
     [SerializeField, HideInInspector]
     private bool removeGeneratedObject;
 
+    [SerializeField, HideInInspector]
+    private bool createdByBuilder = true;
+
     public override bool RemoveGameObjectWithComponent => removeGeneratedObject;
+    public bool CreatedByBuilder => createdByBuilder;
 
     private void Reset()
     {
@@ -59,6 +63,12 @@ public class GeneratedTargetMetadata : AuthoringOnlyComponent
     public void ConfigureCleanup(bool removeOwnerGameObject)
     {
         removeGeneratedObject = removeOwnerGameObject;
+        HideInternalComponent();
+    }
+
+    public void ConfigureOwnership(bool builderCreated)
+    {
+        createdByBuilder = builderCreated;
         HideInternalComponent();
     }
 

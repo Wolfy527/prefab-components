@@ -21,6 +21,7 @@ public interface ILiveMirroringProcessor
     void Process(LiveMirroringSystem system);
 }
 
+#if UNITY_EDITOR
 public static class LiveMirroringProcessorRegistry
 {
     private static IReadOnlyList<ILiveMirroringProcessor> processors;
@@ -49,8 +50,9 @@ public static class LiveMirroringProcessorRegistry
             string id = string.IsNullOrWhiteSpace(processor.ProcessorId)
                 ? processor.GetType().FullName
                 : processor.ProcessorId;
+            string failureKey = id + ":" + system.GetInstanceID();
 
-            if (failedProcessors.Contains(id))
+            if (failedProcessors.Contains(failureKey))
                 continue;
 
             try
@@ -59,7 +61,7 @@ public static class LiveMirroringProcessorRegistry
             }
             catch (Exception exception)
             {
-                failedProcessors.Add(id);
+                failedProcessors.Add(failureKey);
                 Debug.LogException(exception, system);
             }
         }
@@ -88,6 +90,13 @@ public static class LiveMirroringProcessorRegistry
             {
                 types = exception.Types.Where(type => type != null).ToArray();
             }
+            catch (Exception exception)
+            {
+                Debug.LogWarning(
+                    $"Live Mirroring could not inspect optional processor " +
+                    $"assembly '{assembly.FullName}': {exception.Message}");
+                continue;
+            }
 
             foreach (Type type in types)
             {
@@ -102,20 +111,53 @@ public static class LiveMirroringProcessorRegistry
                 {
                     discovered.Add((ILiveMirroringProcessor)Activator.CreateInstance(type));
                 }
-                catch
+                catch (Exception exception)
                 {
-                    // One optional extension must not prevent other extensions from loading.
+                    Debug.LogWarning(
+                        $"Live Mirroring could not create optional processor " +
+                        $"'{type.FullName}': {exception.Message}");
                 }
             }
         }
 
         return discovered
-            .GroupBy(processor => processor.ProcessorId ?? processor.GetType().FullName)
-            .Select(group => group.First())
+            .GroupBy(processor =>
+                string.IsNullOrWhiteSpace(processor.ProcessorId)
+                    ? processor.GetType().FullName
+                    : processor.ProcessorId.Trim())
+            .Select(ResolveCollision)
+            .Where(processor => processor != null)
             .OrderBy(processor => processor.Stage)
             .ThenBy(processor => processor.Order)
             .ThenBy(processor => processor.ProcessorId, StringComparer.Ordinal)
             .ToArray();
     }
+
+    private static ILiveMirroringProcessor ResolveCollision(
+        IGrouping<string, ILiveMirroringProcessor> group)
+    {
+        ILiveMirroringProcessor[] candidates = group.ToArray();
+        if (candidates.Length == 1)
+            return candidates[0];
+
+        ILiveMirroringProcessor[] builtIn = candidates
+            .Where(candidate =>
+                candidate.GetType().Assembly ==
+                typeof(LiveMirroringProcessorRegistry).Assembly)
+            .ToArray();
+        ILiveMirroringProcessor selected =
+            builtIn.Length == 1 ? builtIn[0] : null;
+
+        Debug.LogError(
+            $"Live Mirroring found {candidates.Length} processors using ID " +
+            $"'{group.Key}'. " +
+            (selected != null
+                ? $"The built-in '{selected.GetType().FullName}' was retained."
+                : "All conflicting processors were disabled.") +
+            " Conflicting IDs must be renamed."
+        );
+        return selected;
+    }
 }
+#endif
 }

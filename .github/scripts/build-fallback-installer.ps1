@@ -3,7 +3,10 @@ param(
     [string] $PackageRoot = ".",
 
     [Parameter(Mandatory = $false)]
-    [string] $OutputDirectory = ".artifacts/fallback"
+    [string] $OutputDirectory = ".artifacts/fallback",
+
+    [Parameter(Mandatory = $false)]
+    [string] $ProjectInstallerRoot = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -413,15 +416,10 @@ try {
     Test-FallbackPayload -Path $payloadPath -ExpectedVersion $version
     Copy-Item -LiteralPath $payloadPath -Destination $payloadOutput -Force
 
-    $bootstrapSource =
-        (Get-Content -LiteralPath $templatePath -Raw).Replace(
-            "@@BUNDLED_VERSION@@",
-            $version
-        )
-    if ($bootstrapSource.Contains("@@BUNDLED_VERSION@@") -or
-        -not $bootstrapSource.Contains(
+    $bootstrapSource = Get-Content -LiteralPath $templatePath -Raw
+    if (-not $bootstrapSource.Contains(
             'com.wolfy527.prefab-components.fallback')) {
-        throw "Fallback bootstrap template was not rendered correctly."
+        throw "Fallback bootstrap template is invalid."
     }
 
     $stagedInstallerRoot = Join-Path $installerStage $installerRootPath
@@ -456,6 +454,44 @@ try {
         -LiteralPath $installerOutput `
         -Destination $standaloneInstallerOutput `
         -Force
+
+    if (-not [string]::IsNullOrWhiteSpace($ProjectInstallerRoot)) {
+        $projectInstallerPath = [System.IO.Path]::GetFullPath(
+            $ProjectInstallerRoot
+        )
+        $projectEditorPath = Join-Path $projectInstallerPath "Editor"
+        New-Item -ItemType Directory -Path $projectEditorPath -Force |
+            Out-Null
+        foreach ($obsoleteAssemblyFile in @(
+            "Wolfy527.PrefabComponentsFallbackInstaller.asmdef",
+            "Wolfy527.PrefabComponentsFallbackInstaller.asmdef.meta"
+        )) {
+            $obsoleteAssemblyPath =
+                Join-Path $projectEditorPath $obsoleteAssemblyFile
+            if (Test-Path -LiteralPath $obsoleteAssemblyPath -PathType Leaf) {
+                Remove-Item -LiteralPath $obsoleteAssemblyPath -Force
+            }
+        }
+        Write-Utf8NoBom `
+            -Path (Join-Path $projectEditorPath "PrefabComponentsBootstrap.cs") `
+            -Value $bootstrapSource
+        Copy-Item `
+            -LiteralPath $payloadPath `
+            -Destination (
+                Join-Path $projectInstallerPath "PrefabComponentsFallback.bytes"
+            ) `
+            -Force
+
+        $projectBootstrapPath = Join-Path `
+            $projectEditorPath `
+            "PrefabComponentsBootstrap.cs"
+        $projectPayloadPath = Join-Path `
+            $projectInstallerPath `
+            "PrefabComponentsFallback.bytes"
+        Test-FallbackPayload `
+            -Path $projectPayloadPath `
+            -ExpectedVersion $version
+    }
 
     $payloadHash = (Get-FileHash -LiteralPath $payloadOutput -Algorithm SHA256).Hash
     $installerHash =

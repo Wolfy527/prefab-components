@@ -5,9 +5,6 @@ param(
 
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path -LiteralPath $PackageRoot).Path
-$manifest =
-    Get-Content -LiteralPath (Join-Path $root "package.json") -Raw |
-    ConvertFrom-Json
 $templatePath = Join-Path $root `
     ".github/fallback-installer/PrefabComponentsBootstrap.cs.template"
 $legacyMigrationPath = Join-Path $root `
@@ -34,11 +31,7 @@ function Write-Utf8NoBom {
 try {
     New-Item -ItemType Directory -Path $workingRoot -Force | Out-Null
 
-    $bootstrap =
-        (Get-Content -LiteralPath $templatePath -Raw).Replace(
-            "@@BUNDLED_VERSION@@",
-            [string] $manifest.version
-        )
+    $bootstrap = Get-Content -LiteralPath $templatePath -Raw
     Write-Utf8NoBom `
         -Path (Join-Path $workingRoot "PrefabComponentsBootstrap.cs") `
         -Value $bootstrap
@@ -75,6 +68,7 @@ namespace UnityEditor
     using System;
 
     public sealed class PackageInfo {}
+    public abstract class AssetPostprocessor {}
 
     [AttributeUsage(AttributeTargets.Class)]
     public sealed class InitializeOnLoadAttribute : Attribute {}

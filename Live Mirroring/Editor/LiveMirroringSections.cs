@@ -67,6 +67,14 @@ public static class LiveMirroringSections
         }
 
         DrawPairValidation(serializedObject, pairs);
+        if (pairs.arraySize > 64)
+        {
+            PropToolsEditor.Warning(
+                "Large Scene Preview",
+                "Scene Preview displays at most 128 unique target ghosts to " +
+                "keep the Unity editor responsive."
+            );
+        }
         DrawAddPairButton(pairs);
 
         if (pairs.arraySize == 0)
@@ -146,6 +154,8 @@ public static class LiveMirroringSections
         LiveMirroringSystem system = serializedObject.targetObject as LiveMirroringSystem;
         Transform root = LiveMirroringService.ResolveRoot(system);
         HashSet<Transform> controlledMirroredTargets = new HashSet<Transform>();
+        Dictionary<Transform, List<Transform>> edges =
+            new Dictionary<Transform, List<Transform>>();
 
         for (int i = 0; i < pairs.arraySize; i++)
         {
@@ -190,6 +200,18 @@ public static class LiveMirroringSections
                     $"Another enabled pair already controls '{mirrored.name}'. The first pair wins."
                 );
             }
+            else if (WouldCreateCycle(source, mirrored, edges))
+            {
+                controlledMirroredTargets.Remove(mirrored);
+                PropToolsEditor.Error(
+                    $"{label} Creates A Mirror Cycle",
+                    "This pair feeds back into an earlier pair and will be ignored."
+                );
+            }
+            else
+            {
+                AddEdge(edges, source, mirrored);
+            }
 
             if (root != null && (!source.IsChildOf(root) || !mirrored.IsChildOf(root)))
             {
@@ -199,6 +221,51 @@ public static class LiveMirroringSections
                 );
             }
         }
+    }
+
+    private static bool WouldCreateCycle(
+        Transform source,
+        Transform mirrored,
+        IReadOnlyDictionary<Transform, List<Transform>> edges)
+    {
+        HashSet<Transform> visited = new HashSet<Transform>();
+        Stack<Transform> pending = new Stack<Transform>();
+        pending.Push(mirrored);
+
+        while (pending.Count > 0)
+        {
+            Transform current = pending.Pop();
+            if (current == null || !visited.Add(current))
+                continue;
+            if (current == source)
+                return true;
+
+            if (!edges.TryGetValue(
+                    current,
+                    out List<Transform> next))
+                continue;
+
+            foreach (Transform target in next)
+                pending.Push(target);
+        }
+
+        return false;
+    }
+
+    private static void AddEdge(
+        IDictionary<Transform, List<Transform>> edges,
+        Transform source,
+        Transform mirrored)
+    {
+        if (!edges.TryGetValue(
+                source,
+                out List<Transform> targets))
+        {
+            targets = new List<Transform>();
+            edges.Add(source, targets);
+        }
+
+        targets.Add(mirrored);
     }
 
     private static void DrawAddPairButton(SerializedProperty pairs)

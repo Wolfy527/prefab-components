@@ -53,11 +53,13 @@ public class LiveMirroringSystem : AuthoringOnlyComponent
 
     private void OnValidate()
     {
+#if UNITY_EDITOR
         if (dataVersion > LiveMirroringMigrationService.CurrentDataVersion)
             return;
 
         EnsureSerializedDefaults();
         LiveMirroringMigrationService.MigrateIfNeeded(this);
+#endif
     }
 
     private void Update()
@@ -69,7 +71,9 @@ public class LiveMirroringSystem : AuthoringOnlyComponent
     public void MirrorAll()
     {
         EnsureSerializedDefaults();
+#if UNITY_EDITOR
         LiveMirroringService.UpdateMirroring(this);
+#endif
     }
 
     public void SetDataVersion(int version)
