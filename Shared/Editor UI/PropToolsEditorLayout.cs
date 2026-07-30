@@ -19,12 +19,13 @@ public static class PropToolsEditorLayout
     public static void Header(
         string title,
         string subtitle = null,
-        float availableWidthOverride = 0f)
+        float availableWidthOverride = 0f,
+        bool showLogo = true)
     {
         Space(PropToolsEditorSpacing.Small);
 
         bool hasSubtitle = !string.IsNullOrWhiteSpace(subtitle);
-        bool hasLogo = HeaderLogo != null;
+        bool hasLogo = showLogo && HeaderLogo != null;
         const float titleHeight = 22f;
         const float descriptionPaddingX = 7f;
         const float descriptionPaddingY = 4f;
@@ -82,7 +83,7 @@ public static class PropToolsEditorLayout
         PropToolsEditorDrawing.AccentBar(rect, PropToolsEditorTheme.Accent, 5f);
 
         float textX = rect.x + 16f;
-        Texture2D logo = HeaderLogo;
+        Texture2D logo = hasLogo ? HeaderLogo : null;
 
         if (logo != null)
         {
@@ -132,16 +133,21 @@ public static class PropToolsEditorLayout
                 );
             }
 
-            GUI.Label(
-                new Rect(
-                    descriptionRect.x + descriptionPaddingX,
-                    descriptionRect.y + descriptionPaddingY,
-                    Mathf.Max(0f, descriptionRect.width - descriptionPaddingX * 2f),
-                    actualSubtitleHeight
+            Rect subtitleRect = new Rect(
+                descriptionRect.x + descriptionPaddingX,
+                descriptionRect.y + descriptionPaddingY,
+                Mathf.Max(
+                    0f,
+                    descriptionRect.width - descriptionPaddingX * 2f
                 ),
-                new GUIContent(subtitle, subtitle),
+                actualSubtitleHeight
+            );
+            GUI.Label(
+                subtitleRect,
+                PropToolsEditorTooltips.Content(subtitle, subtitle),
                 PropToolsEditorStyles.HeaderSubtitle
             );
+            PropToolsEditorTooltips.Track(descriptionRect, subtitle);
         }
 
         Space(PropToolsEditorSpacing.Medium);
@@ -378,15 +384,22 @@ public static class PropToolsEditorLayout
             );
         }
 
+        string resolvedBadgeTooltip = string.IsNullOrWhiteSpace(
+            badgeTooltip
+        )
+            ? "Identifies the kind of generated object represented by this card."
+            : badgeTooltip;
         GUI.Label(
             badgeRect,
-            new GUIContent(
+            PropToolsEditorTooltips.Content(
                 badge,
-                string.IsNullOrWhiteSpace(badgeTooltip)
-                    ? "Identifies the kind of generated object represented by this card."
-                    : badgeTooltip
+                resolvedBadgeTooltip
             ),
             PropToolsEditorStyles.ItemBadge
+        );
+        PropToolsEditorTooltips.Track(
+            badgeRect,
+            resolvedBadgeTooltip
         );
 
         Rect removeRect = new Rect(header.xMax - 66f, header.y + 7f, 58f, 20f);
@@ -404,15 +417,22 @@ public static class PropToolsEditorLayout
             Mathf.Max(0f, available - summaryWidth - (summaryWidth > 0f ? 8f : 0f)),
             20f
         );
+        string resolvedTitleTooltip = string.IsNullOrWhiteSpace(
+            titleTooltip
+        )
+            ? "Name of this generated object. Expand the card to edit its settings."
+            : titleTooltip;
         GUI.Label(
             titleRect,
-            new GUIContent(
+            PropToolsEditorTooltips.Content(
                 title,
-                string.IsNullOrWhiteSpace(titleTooltip)
-                    ? "Name of this generated object. Expand the card to edit its settings."
-                    : titleTooltip
+                resolvedTitleTooltip
             ),
             PropToolsEditorStyles.ItemTitle
+        );
+        PropToolsEditorTooltips.Track(
+            titleRect,
+            resolvedTitleTooltip
         );
 
         if (summaryWidth > 0f && !string.IsNullOrWhiteSpace(summary))
@@ -423,7 +443,12 @@ public static class PropToolsEditorLayout
                 summaryWidth,
                 18f
             );
-            GUI.Label(summaryRect, new GUIContent(summary, summary), PropToolsEditorStyles.ItemSummary);
+            GUI.Label(
+                summaryRect,
+                PropToolsEditorTooltips.Content(summary, summary),
+                PropToolsEditorStyles.ItemSummary
+            );
+            PropToolsEditorTooltips.Track(summaryRect, summary);
         }
 
         EditorGUIUtility.AddCursorRect(header, MouseCursor.Link);
@@ -510,9 +535,10 @@ public static class PropToolsEditorLayout
 
         GUI.Label(
             labelRect,
-            new GUIContent(title, tooltip),
+            PropToolsEditorTooltips.Content(title, tooltip),
             PropToolsEditorStyles.ItemTitle
         );
+        PropToolsEditorTooltips.Track(labelRect, tooltip);
 
         bool clicked = PropToolsEditorControls.MiniButton(
             buttonRect,
@@ -710,6 +736,7 @@ public static class PropToolsEditorLayout
             PropToolsEditorTooltips.Content(title),
             SmallFoldoutLabelStyle
         );
+        PropToolsEditorTooltips.Track(labelRect, title);
 
         EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
 
@@ -749,11 +776,18 @@ public static class PropToolsEditorLayout
             PropToolsEditorDrawing.BottomLine(rect, PropToolsEditorTheme.BorderSoft);
         }
 
+        Rect labelRect = new Rect(
+            rect.x + 10f,
+            rect.y + 3f,
+            rect.width - 20f,
+            18f
+        );
         GUI.Label(
-            new Rect(rect.x + 10f, rect.y + 3f, rect.width - 20f, 18f),
+            labelRect,
             PropToolsEditorTooltips.Content(text),
             PropToolsEditorStyles.SubHeader
         );
+        PropToolsEditorTooltips.Track(labelRect, text);
     }
 
     private static void DrawBackground(Rect rect)

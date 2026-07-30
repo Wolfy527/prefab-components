@@ -57,6 +57,7 @@ public static class PropToolsEditorControls
 
         bool newValue = ToggleBox(box, value);
         GUI.Label(labelRect, PropToolsEditorTooltips.Content(label, property), PropToolsEditorStyles.MutedLabel);
+        PropToolsEditorTooltips.Track(labelRect, label, property);
 
         EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
 
@@ -287,6 +288,7 @@ public static class PropToolsEditorControls
             valueRect.x - 7f
         );
         GUI.Label(labelRect, PropToolsEditorTooltips.Content(label, property), PropToolsEditorStyles.PropertyLabel);
+        PropToolsEditorTooltips.Track(labelRect, label, property);
         GUI.Label(valueRect, displayFormatter?.Invoke(property.intValue) ?? property.intValue.ToString(), PropToolsEditorStyles.ValueLabel);
 
         if (MiniButton(minusRect, "-")) property.intValue = Mathf.Clamp(property.intValue - 1, min, max);
@@ -326,6 +328,7 @@ public static class PropToolsEditorControls
             hover
         );
         GUI.Label(rect, PropToolsEditorTooltips.Content(text), PropToolsEditorStyles.MiniButtonLabel);
+        PropToolsEditorTooltips.Track(rect, text);
 
         EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
 
@@ -364,6 +367,7 @@ public static class PropToolsEditorControls
         }
 
         GUI.Label(rect, PropToolsEditorTooltips.Content(text), hover ? QuietDangerHoverLabel : QuietDangerLabel);
+        PropToolsEditorTooltips.Track(rect, text);
         EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
 
         if (Event.current.type == EventType.MouseDown &&
@@ -404,6 +408,7 @@ public static class PropToolsEditorControls
             true
         );
         GUI.Label(rect, PropToolsEditorTooltips.Content(text), PropToolsEditorStyles.ButtonLabel);
+        PropToolsEditorTooltips.Track(rect, text);
 
         EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);
 

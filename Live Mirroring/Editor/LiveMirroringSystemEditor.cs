@@ -11,14 +11,13 @@ using UnityEngine;
 [CustomEditor(typeof(LiveMirroringSystem))]
 public class LiveMirroringSystemEditor : Editor
 {
-    private readonly Dictionary<string, bool> expandedSections =
-        new Dictionary<string, bool>();
     private readonly HashSet<string> failedValidators = new HashSet<string>();
 
     public override bool RequiresConstantRepaint() => false;
 
     public override void OnInspectorGUI()
     {
+        using (PropToolsEditorTooltips.PushThemedScope(this))
         using (PropToolsEditorFields.PushInteractionScope(this))
         {
             if (Event.current.type == EventType.MouseMove)
@@ -58,33 +57,27 @@ public class LiveMirroringSystemEditor : Editor
             }
 
             DrawExtensionValidation();
-
-            foreach (ILiveMirroringInspectorSection section in
-                     LiveMirroringEditorExtensionRegistry.GetSections())
-            {
-                if (section == null || !section.IsVisible(serializedObject))
-                    continue;
-
-                bool expanded = GetExpanded(section);
-                DrawSection(
-                    ref expanded,
-                    section.Title,
-                    section.GetSummary(serializedObject),
-                    () => section.Draw(serializedObject)
-                );
-                expandedSections[section.SectionId] = expanded;
-            }
-
-            serializedObject.ApplyModifiedProperties();
+            DrawReadOnlyStatus(mirroringSystem);
         }
     }
 
-    private bool GetExpanded(ILiveMirroringInspectorSection section)
+    private static void DrawReadOnlyStatus(
+        LiveMirroringSystem mirroringSystem)
     {
-        if (expandedSections.TryGetValue(section.SectionId, out bool expanded))
-            return expanded;
+        int pairCount = mirroringSystem?.pairs?.Length ?? 0;
+        string pairSummary = pairCount == 1
+            ? "1 mirrored pair is configured."
+            : $"{pairCount} mirrored pairs are configured.";
+        string previewSummary =
+            mirroringSystem != null && mirroringSystem.showScenePreview
+                ? "Scene preview ghosts are enabled."
+                : "Scene preview ghosts are disabled.";
 
-        return section.DefaultExpanded;
+        PropToolsEditor.Info(
+            "Configured Automatically",
+            $"{pairSummary} {previewSummary} " +
+            "This component is configured by the prefab author and works automatically in the editor."
+        );
     }
 
     private void DrawExtensionValidation()
@@ -102,7 +95,7 @@ public class LiveMirroringSystemEditor : Editor
             {
                 contributor.Validate(serializedObject, messages);
             }
-            catch (Exception exception)
+            catch (System.Exception exception)
             {
                 failedValidators.Add(contributor.ContributorId);
                 Debug.LogException(exception, target);
@@ -129,22 +122,5 @@ public class LiveMirroringSystemEditor : Editor
         }
     }
 
-    private static void DrawSection(
-        ref bool expanded,
-        string title,
-        string summary,
-        Action drawContent)
-    {
-        PropToolsEditor.Foldout(
-            ref expanded,
-            title,
-            compactSummary: summary
-        );
-
-        if (!expanded)
-            return;
-
-        PropToolsEditor.Card(drawContent);
-    }
 }
 }

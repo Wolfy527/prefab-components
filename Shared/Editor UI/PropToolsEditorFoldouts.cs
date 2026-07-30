@@ -121,6 +121,7 @@ public static class PropToolsEditorFoldouts
         GUIStyle titleStyle = enabled ? EnabledTitleStyle : DisabledTitleStyle;
 
         GUI.Label(labelRect, PropToolsEditorTooltips.Content(title), titleStyle);
+        PropToolsEditorTooltips.Track(labelRect, title);
 
         if (!expanded && !string.IsNullOrWhiteSpace(compactSummary))
         {
@@ -137,18 +138,32 @@ public static class PropToolsEditorFoldouts
 
             GUI.Label(
                 summaryRect,
-                new GUIContent(compactSummary, compactSummary),
+                PropToolsEditorTooltips.Content(
+                    compactSummary,
+                    compactSummary
+                ),
                 CompactSummaryStyle
+            );
+            PropToolsEditorTooltips.Track(
+                summaryRect,
+                compactSummary
             );
         }
 
         if (!string.IsNullOrWhiteSpace(subtitle))
         {
+            Rect subtitleRect = new Rect(
+                labelRect.x,
+                rect.y + 27f,
+                labelRect.width,
+                14f
+            );
             GUI.Label(
-                new Rect(labelRect.x, rect.y + 27f, labelRect.width, 14f),
-                new GUIContent(subtitle, subtitle),
+                subtitleRect,
+                PropToolsEditorTooltips.Content(subtitle, subtitle),
                 PropToolsEditorStyles.SectionSubtitle
             );
+            PropToolsEditorTooltips.Track(subtitleRect, subtitle);
         }
 
         EditorGUIUtility.AddCursorRect(rect, MouseCursor.Link);

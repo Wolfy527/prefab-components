@@ -1,5 +1,5 @@
 # Changelog
 
-## 1.0.21
+## 1.0.22
 
-- Reduced player compilation work while preserving Live Mirroring and upload cleanup.
+- Refined the shared UI, tooltips, and Live Mirroring inspector.

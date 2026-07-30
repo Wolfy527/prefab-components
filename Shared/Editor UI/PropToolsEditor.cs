@@ -9,8 +9,14 @@ public static class PropToolsEditor
     public static void Header(
         string title,
         string subtitle = null,
-        float availableWidth = 0f) =>
-        PropToolsEditorLayout.Header(title, subtitle, availableWidth);
+        float availableWidth = 0f,
+        bool showLogo = true) =>
+        PropToolsEditorLayout.Header(
+            title,
+            subtitle,
+            availableWidth,
+            showLogo
+        );
 
     public static void Module(ref bool expanded, string title, bool enabled, string subtitle, bool selected, Action content) =>
         PropToolsEditorLayout.Module(ref expanded, title, enabled, subtitle, selected, content);

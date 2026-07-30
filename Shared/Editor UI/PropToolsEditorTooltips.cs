@@ -1,11 +1,49 @@
 namespace Wolfy.PropTools.EditorUI
 {
+using System;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
 public static class PropToolsEditorTooltips
 {
+    private const float TooltipMargin = 6f;
+    private const float TooltipOffsetX = 14f;
+    private const float TooltipOffsetY = 18f;
+    private const float MinimumTooltipWidth = 150f;
+    private const float PreferredMaximumTooltipWidth = 360f;
+
+    private static UnityEngine.Object themedOwner;
+    private static string themedTooltip;
+    private static GUIStyle themedTooltipStyle;
+    private static GUIStyle themedTooltipMeasureStyle;
+
+    public readonly struct ThemedScope : IDisposable
+    {
+        private readonly UnityEngine.Object owner;
+        private readonly UnityEngine.Object previousOwner;
+        private readonly string previousTooltip;
+
+        internal ThemedScope(
+            UnityEngine.Object owner,
+            UnityEngine.Object previousOwner,
+            string previousTooltip)
+        {
+            this.owner = owner;
+            this.previousOwner = previousOwner;
+            this.previousTooltip = previousTooltip;
+        }
+
+        public void Dispose()
+        {
+            if (themedOwner == owner)
+                DrawThemedOverlay(owner);
+
+            themedOwner = previousOwner;
+            themedTooltip = previousTooltip;
+        }
+    }
+
     private static readonly Dictionary<string, string> descriptions =
         new Dictionary<string, string>
         {
@@ -135,8 +173,218 @@ public static class PropToolsEditorTooltips
             : string.Empty;
     }
 
+    public static ThemedScope PushThemedScope(UnityEngine.Object owner)
+    {
+        ThemedScope scope = new ThemedScope(
+            owner,
+            themedOwner,
+            themedTooltip
+        );
+        themedOwner = owner;
+        themedTooltip = null;
+        return scope;
+    }
+
+    public static void Track(
+        Rect rect,
+        string label,
+        SerializedProperty property = null)
+    {
+        Track(rect, Get(label, property));
+    }
+
+    public static void Track(Rect rect, string tooltip)
+    {
+        if (themedOwner == null ||
+            string.IsNullOrWhiteSpace(tooltip) ||
+            !rect.Contains(Event.current.mousePosition))
+        {
+            return;
+        }
+
+        themedTooltip = tooltip.Trim();
+
+        if (Event.current.type == EventType.MouseMove)
+        {
+            if (themedOwner is EditorWindow window)
+                window.Repaint();
+            else if (themedOwner is Editor editor)
+                editor.Repaint();
+        }
+    }
+
     public static GUIContent Content(string label, SerializedProperty property = null) =>
-        new GUIContent(label, Get(label, property));
+        new GUIContent(
+            label,
+            themedOwner == null ? Get(label, property) : string.Empty
+        );
+
+    public static GUIContent Content(string label, string tooltip) =>
+        new GUIContent(
+            label,
+            themedOwner == null ? tooltip ?? string.Empty : string.Empty
+        );
+
+    public static GUIContent Content(GUIContent source)
+    {
+        if (source == null)
+            return GUIContent.none;
+
+        return new GUIContent(
+            source.text,
+            source.image,
+            themedOwner == null ? source.tooltip : string.Empty
+        );
+    }
+
+    public static void Track(Rect rect, GUIContent content)
+    {
+        if (content != null)
+            Track(rect, content.tooltip);
+    }
+
+    private static void DrawThemedOverlay(UnityEngine.Object owner)
+    {
+        if (Event.current.type != EventType.Repaint ||
+            string.IsNullOrWhiteSpace(themedTooltip))
+        {
+            return;
+        }
+
+        float windowWidth;
+        float windowHeight;
+
+        if (owner is EditorWindow window)
+        {
+            windowWidth = window.position.width;
+            windowHeight = window.position.height;
+        }
+        else if (owner is Editor)
+        {
+            windowWidth = EditorGUIUtility.currentViewWidth;
+            EditorWindow hostWindow = EditorWindow.mouseOverWindow;
+            windowHeight = hostWindow != null
+                ? hostWindow.position.height
+                : Screen.currentResolution.height;
+        }
+        else
+        {
+            return;
+        }
+
+        windowWidth = Mathf.Max(1f, windowWidth);
+        windowHeight = Mathf.Max(1f, windowHeight);
+        float usableWidth = Mathf.Max(
+            1f,
+            windowWidth - (TooltipMargin * 2f)
+        );
+        float usableHeight = Mathf.Max(
+            1f,
+            windowHeight - (TooltipMargin * 2f)
+        );
+
+        GUIContent content = new GUIContent(themedTooltip);
+        Vector2 measured = ThemedTooltipMeasureStyle.CalcSize(content);
+        float minimumWidth = Mathf.Min(
+            MinimumTooltipWidth,
+            usableWidth
+        );
+        float preferredMaximumWidth = Mathf.Min(
+            PreferredMaximumTooltipWidth,
+            usableWidth
+        );
+        float width = Mathf.Clamp(
+            Mathf.Ceil(
+                measured.x +
+                ThemedTooltipStyle.padding.horizontal
+            ),
+            minimumWidth,
+            preferredMaximumWidth
+        );
+        float height = CalculateTooltipHeight(content, width);
+
+        if (height > usableHeight && width < usableWidth)
+        {
+            width = usableWidth;
+            height = CalculateTooltipHeight(content, width);
+        }
+
+        Vector2 mouse = Event.current.mousePosition;
+        float x = mouse.x + TooltipOffsetX;
+        float y = mouse.y + TooltipOffsetY;
+
+        if (x + width > windowWidth - TooltipMargin)
+            x = mouse.x - width - TooltipOffsetX;
+
+        if (y + height > windowHeight - TooltipMargin)
+            y = mouse.y - height - TooltipOffsetY;
+
+        Rect card = new Rect(
+            Mathf.Clamp(
+                x,
+                TooltipMargin,
+                Mathf.Max(
+                    TooltipMargin,
+                    windowWidth - width - TooltipMargin
+                )
+            ),
+            Mathf.Clamp(
+                y,
+                TooltipMargin,
+                Mathf.Max(
+                    TooltipMargin,
+                    windowHeight - height - TooltipMargin
+                )
+            ),
+            width,
+            height
+        );
+
+        PropToolsEditorDrawing.RoundedRect(
+            new Rect(card.x + 2f, card.y + 2f, card.width, card.height),
+            PropToolsEditorTheme.BackgroundDark,
+            PropToolsEditorTheme.BackgroundDark,
+            4f
+        );
+        PropToolsEditorDrawing.RoundedRect(
+            card,
+            PropToolsEditorTheme.Panel,
+            PropToolsEditorTheme.BorderStrong,
+            4f
+        );
+        GUI.Label(card, content, ThemedTooltipStyle);
+    }
+
+    private static float CalculateTooltipHeight(
+        GUIContent content,
+        float width) =>
+        Mathf.Max(
+            EditorGUIUtility.singleLineHeight +
+            ThemedTooltipStyle.padding.vertical,
+            Mathf.Ceil(
+                ThemedTooltipStyle.CalcHeight(
+                    content,
+                    Mathf.Max(1f, width)
+                )
+            )
+        );
+
+    private static GUIStyle ThemedTooltipStyle =>
+        themedTooltipStyle ?? (themedTooltipStyle =
+            new GUIStyle(PropToolsEditorStyles.Label)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                wordWrap = true,
+                padding = new RectOffset(8, 8, 7, 7)
+            });
+
+    private static GUIStyle ThemedTooltipMeasureStyle =>
+        themedTooltipMeasureStyle ?? (themedTooltipMeasureStyle =
+            new GUIStyle(PropToolsEditorStyles.Label)
+            {
+                wordWrap = false,
+                padding = new RectOffset(0, 0, 0, 0)
+            });
 
 }
 }

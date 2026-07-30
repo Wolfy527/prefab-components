@@ -89,7 +89,18 @@ public static class PropToolsEditorFields
             case SerializedPropertyType.Enum: DrawEnum(property, finalLabel); break;
             case SerializedPropertyType.Vector2: DrawVector2(property, finalLabel); break;
             case SerializedPropertyType.Vector3: DrawVector3(property, finalLabel); break;
-            default: EditorGUILayout.PropertyField(property, PropToolsEditorTooltips.Content(finalLabel, property), true); break;
+            default:
+                EditorGUILayout.PropertyField(
+                    property,
+                    PropToolsEditorTooltips.Content(finalLabel, property),
+                    true
+                );
+                PropToolsEditorTooltips.Track(
+                    GUILayoutUtility.GetLastRect(),
+                    finalLabel,
+                    property
+                );
+                break;
         }
     }
 
@@ -405,6 +416,7 @@ public static class PropToolsEditorFields
             fieldRect.x - 7f
         );
         GUI.Label(labelRect, PropToolsEditorTooltips.Content(label, property), PropToolsEditorStyles.PropertyLabel);
+        PropToolsEditorTooltips.Track(labelRect, label, property);
 
         return fieldRect;
     }
